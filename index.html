@@ -180,6 +180,21 @@
           </div>
         </div>
 
+        <!-- 錄影檔案命名 -->
+        <div class="mb-5">
+          <label class="block text-sm font-medium text-slate-700 mb-2">錄影檔案命名</label>
+          <div class="grid grid-cols-3 gap-2">
+            <select id="filenameModeSelect"
+              class="col-span-2 bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm cursor-pointer">
+              <option value="sequence" selected>雙位數編號</option>
+              <option value="date-sequence">日期＋雙位數編號</option>
+            </select>
+            <input id="recordingSequenceInput" type="number" min="1" max="99" value="1" aria-label="錄影檔案編號"
+              class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+          </div>
+          <p class="text-xs text-slate-500 mt-2">檔名預覽：<span id="filenamePreview" class="font-medium text-slate-700">01</span></p>
+        </div>
+
         <!-- 開關選項區塊 -->
         <div class="space-y-3 mb-8">
           <!-- 系統音訊 -->
@@ -505,6 +520,9 @@
     const countdownToggle = document.getElementById('countdownToggle');
     const countdownSecondsSelect = document.getElementById('countdownSecondsSelect');
     const displaySurfaceMode = document.getElementById('displaySurfaceMode');
+    const filenameModeSelect = document.getElementById('filenameModeSelect');
+    const recordingSequenceInput = document.getElementById('recordingSequenceInput');
+    const filenamePreview = document.getElementById('filenamePreview');
 
     const previewContainer = document.getElementById('previewContainer');
     const previewVideo = document.getElementById('previewVideo');
@@ -567,6 +585,37 @@
     countdownSecondsSelect.addEventListener('change', () => {
       localStorage.setItem('screenRecorderCountdownSeconds', countdownSecondsSelect.value);
     });
+
+    filenameModeSelect.value = localStorage.getItem('screenRecorderFilenameMode') || 'sequence';
+    recordingSequenceInput.value = localStorage.getItem('screenRecorderSequence') || '1';
+
+    function getLocalDateString() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    }
+
+    function getRecordingBaseName() {
+      const sequence = Math.max(1, Math.min(99, Number(recordingSequenceInput.value) || 1));
+      const paddedSequence = String(sequence).padStart(2, '0');
+      return filenameModeSelect.value === 'date-sequence'
+        ? `${getLocalDateString()}_${paddedSequence}`
+        : paddedSequence;
+    }
+
+    function updateFilenamePreview() {
+      const sequence = Math.max(1, Math.min(99, Number(recordingSequenceInput.value) || 1));
+      recordingSequenceInput.value = sequence;
+      localStorage.setItem('screenRecorderFilenameMode', filenameModeSelect.value);
+      localStorage.setItem('screenRecorderSequence', sequence);
+      filenamePreview.textContent = getRecordingBaseName();
+    }
+
+    filenameModeSelect.addEventListener('change', updateFilenamePreview);
+    recordingSequenceInput.addEventListener('input', updateFilenamePreview);
+    updateFilenamePreview();
 
     function syncDeviceSelectStates() {
       micDeviceSelect.disabled = !micToggle.checked;
@@ -1313,9 +1362,13 @@
 
       playbackVideo.src = url;
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+      const baseName = getRecordingBaseName();
       downloadLink.href = url;
-      downloadLink.download = `ScreenRecord_Pro_${timestamp}.${ext}`;
+      downloadLink.download = `${baseName}.${ext}`;
+
+      const currentSequence = Math.max(1, Math.min(99, Number(recordingSequenceInput.value) || 1));
+      recordingSequenceInput.value = currentSequence >= 99 ? 1 : currentSequence + 1;
+      updateFilenamePreview();
     }
 
     // 事件綁定
