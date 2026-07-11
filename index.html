@@ -76,11 +76,17 @@
     #webcamContainer.border-blue { border-color: #3b82f6; }
     #webcamContainer.border-amber { border-color: #f59e0b; }
 
-    #webcamVideo {
+    #webcamVideo, #webcamEffectCanvas {
       width: 100%;
       height: 100%;
       object-fit: cover;
       pointer-events: none;
+    }
+
+    #webcamEffectCanvas {
+      position: absolute;
+      inset: 0;
+      display: none;
     }
 
     /* 隱藏的合成畫布 */
@@ -332,6 +338,7 @@
           <!-- 可拖曳的網路攝影機畫面 (PiP) -->
           <div id="webcamContainer">
             <video id="webcamVideo" autoplay muted playsinline></video>
+            <canvas id="webcamEffectCanvas"></canvas>
           </div>
         </div>
 
@@ -434,6 +441,8 @@
     const previewVideo = document.getElementById('previewVideo');
     const webcamContainer = document.getElementById('webcamContainer');
     const webcamVideo = document.getElementById('webcamVideo');
+    const webcamEffectCanvas = document.getElementById('webcamEffectCanvas');
+    const webcamEffectCtx = webcamEffectCanvas.getContext('2d');
     const playbackVideo = document.getElementById('playbackVideo');
     const videoPlaceholder = document.getElementById('videoPlaceholder');
     const videoArea = document.getElementById('videoArea');
@@ -512,9 +521,14 @@
       webcamContainer.style.visibility = isCameraVisible ? 'visible' : 'hidden';
       cameraVisibilityBtn.textContent = isCameraVisible ? '隱藏畫面' : '顯示畫面';
     });
-    backgroundEffectSelect.addEventListener('change', () => {
-      if (backgroundEffectSelect.value !== 'none') initSelfieSegmentation();
-    });
+    function applyBackgroundEffect() {
+      const hasEffect = backgroundEffectSelect.value !== 'none';
+      webcamVideo.style.visibility = hasEffect ? 'hidden' : 'visible';
+      webcamEffectCanvas.style.display = hasEffect ? 'block' : 'none';
+      webcamContainer.style.background = backgroundEffectSelect.value === 'remove' ? 'transparent' : '#000';
+      if (hasEffect) initSelfieSegmentation();
+    }
+    backgroundEffectSelect.addEventListener('change', applyBackgroundEffect);
     applyCameraAppearance();
 
     function initSelfieSegmentation() {
@@ -525,8 +539,35 @@
       selfieSegmentation.setOptions({ modelSelection: 1 });
       selfieSegmentation.onResults(results => {
         segmentationMask = results.segmentationMask;
+        renderEffectPreview(results);
         isSegmenting = false;
       });
+    }
+
+    function renderEffectPreview(results) {
+      const width = webcamVideo.videoWidth;
+      const height = webcamVideo.videoHeight;
+      if (!width || !height || backgroundEffectSelect.value === 'none') return;
+
+      webcamEffectCanvas.width = width;
+      webcamEffectCanvas.height = height;
+      personCanvas.width = width;
+      personCanvas.height = height;
+      webcamEffectCtx.clearRect(0, 0, width, height);
+      personCtx.clearRect(0, 0, width, height);
+      personCtx.globalCompositeOperation = 'source-over';
+      personCtx.drawImage(results.segmentationMask, 0, 0, width, height);
+      personCtx.globalCompositeOperation = 'source-in';
+      personCtx.drawImage(results.image, 0, 0, width, height);
+      personCtx.globalCompositeOperation = 'source-over';
+
+      if (backgroundEffectSelect.value === 'blur') {
+        webcamEffectCtx.save();
+        webcamEffectCtx.filter = 'blur(18px)';
+        webcamEffectCtx.drawImage(results.image, -18, -18, width + 36, height + 36);
+        webcamEffectCtx.restore();
+      }
+      webcamEffectCtx.drawImage(personCanvas, 0, 0, width, height);
     }
 
     function updateSegmentation() {
@@ -801,20 +842,8 @@
           roundedRectPath(ctx, drawX, drawY, drawW, drawH, radius);
           ctx.clip();
 
-          if (backgroundEffectSelect.value !== 'none' && segmentationMask) {
-            personCanvas.width = webcamVideo.videoWidth;
-            personCanvas.height = webcamVideo.videoHeight;
-            personCtx.clearRect(0, 0, personCanvas.width, personCanvas.height);
-            personCtx.drawImage(segmentationMask, 0, 0, personCanvas.width, personCanvas.height);
-            personCtx.globalCompositeOperation = 'source-in';
-            personCtx.drawImage(webcamVideo, 0, 0, personCanvas.width, personCanvas.height);
-            personCtx.globalCompositeOperation = 'source-over';
-            if (backgroundEffectSelect.value === 'blur') {
-              ctx.filter = 'blur(12px)';
-              ctx.drawImage(webcamVideo, drawX - 12, drawY - 12, drawW + 24, drawH + 24);
-              ctx.filter = 'none';
-            }
-            ctx.drawImage(personCanvas, drawX, drawY, drawW, drawH);
+          if (backgroundEffectSelect.value !== 'none' && webcamEffectCanvas.width > 0) {
+            ctx.drawImage(webcamEffectCanvas, drawX, drawY, drawW, drawH);
           } else {
             ctx.drawImage(webcamVideo, drawX, drawY, drawW, drawH);
           }
@@ -897,6 +926,7 @@
             isCameraVisible = true;
             cameraVisibilityBtn.textContent = '隱藏畫面';
             applyCameraAppearance();
+            applyBackgroundEffect();
           } catch (e) {
             alert("無法存取攝影機，可能是權限被拒絕。");
             cameraToggle.checked = false;
