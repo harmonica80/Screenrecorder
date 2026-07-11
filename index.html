@@ -231,8 +231,13 @@
             <div class="flex items-center gap-3">
               <div class="p-2 bg-blue-100 text-blue-600 rounded-lg"><i data-lucide="timer" class="w-5 h-5"></i></div>
               <div>
-                <p class="font-medium text-sm text-slate-800">錄影前 3 秒倒數</p>
+                <p class="font-medium text-sm text-slate-800">錄影前倒數</p>
                 <p class="text-xs text-slate-500">關閉後，選完分享來源就直接錄影</p>
+                <select id="countdownSecondsSelect" aria-label="倒數秒數"
+                  class="mt-2 bg-white border border-slate-200 text-slate-700 py-1.5 px-2.5 rounded-lg text-xs cursor-pointer"
+                  onclick="event.stopPropagation()">
+                  <option value="3" selected>3 秒</option><option value="5">5 秒</option><option value="10">10 秒</option>
+                </select>
               </div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer" onclick="event.stopPropagation()">
@@ -277,7 +282,7 @@
               </label>
               <label class="text-xs text-slate-600">外框粗細
                 <select id="cameraBorderWidthSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
-                  <option value="4">細（1 倍）</option><option value="8">中（2 倍）</option><option value="16" selected>粗（4 倍）</option><option value="24">特粗（6 倍）</option>
+                  <option value="4">細（1 倍）</option><option value="8" selected>中（2 倍）</option><option value="16">粗（4 倍）</option><option value="24">特粗（6 倍）</option>
                 </select>
               </label>
             </div>
@@ -289,45 +294,42 @@
           </div>
         </div>
 
-        <!-- 狀態與計時器 -->
-        <div class="flex-grow flex flex-col items-center justify-center py-4">
-          <div id="statusBadge"
-            class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 font-medium text-sm mb-3 transition-colors">
-            <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-            <span id="statusText">等待設定</span>
-          </div>
-          <div class="text-5xl lg:text-6xl font-mono font-light tracking-wider text-slate-800" id="timer">00:00</div>
-        </div>
-
-        <!-- 控制按鈕 -->
-        <div class="mt-auto pt-4">
-          <button id="startBtn"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 active:scale-[0.98]">
-            <i data-lucide="radio" class="w-5 h-5"></i>
-            開始擷取與錄製
-          </button>
-          <p id="unsupportedWarning" class="text-red-500 text-xs mt-3 text-center hidden bg-red-50 p-2 rounded-lg border border-red-100">
-            ⚠️ 您的裝置或瀏覽器（如手機或平板）不支援網頁螢幕錄影功能，請改用電腦版瀏覽器開啟。
-          </p>
-
-          <div class="grid grid-cols-2 gap-3 hidden" id="recordingControls">
-            <button id="pauseBtn"
-              class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all">
-              <span id="pauseIconWrapper"><i data-lucide="pause" class="w-5 h-5"></i></span>
-              <span id="pauseText">暫停</span>
-            </button>
-            <button id="stopBtn"
-              class="bg-red-500 hover:bg-red-600 text-white font-medium py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-red-500/30">
-              <i data-lucide="square" class="w-5 h-5 fill-current"></i>
-              結束錄影
-            </button>
-          </div>
-        </div>
       </div>
     </section>
 
     <!-- 右側：畫面預覽與合成區 -->
     <section class="xl:w-2/3 flex flex-col gap-6">
+      <!-- 錄影狀態與控制橫列 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-5 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-4 shrink-0">
+          <div id="statusBadge"
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 font-medium text-sm transition-colors">
+            <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+            <span id="statusText">等待設定</span>
+          </div>
+          <div class="text-3xl font-mono font-light tracking-wider text-slate-800" id="timer">00:00</div>
+        </div>
+        <div class="flex items-center justify-end gap-3">
+          <button id="startBtn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 active:scale-[0.98] whitespace-nowrap">
+            <i data-lucide="radio" class="w-5 h-5"></i>
+            開始擷取與錄製
+          </button>
+          <div class="grid grid-cols-2 gap-3 hidden" id="recordingControls">
+            <button id="pauseBtn"
+              class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-5 rounded-xl flex items-center justify-center gap-2 transition-all whitespace-nowrap">
+              <span id="pauseIconWrapper"><i data-lucide="pause" class="w-5 h-5"></i></span>
+              <span id="pauseText">暫停</span>
+            </button>
+            <button id="stopBtn"
+              class="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-red-500/30 whitespace-nowrap">
+              <i data-lucide="square" class="w-5 h-5 fill-current"></i>
+              結束錄影
+            </button>
+          </div>
+        </div>
+        <p id="unsupportedWarning" class="text-red-500 text-xs hidden">⚠️ 請改用電腦版 Chrome 或 Edge</p>
+      </div>
       <!-- 主要畫面容器 -->
       <div id="videoArea"
         class="bg-slate-900 rounded-2xl shadow-xl overflow-hidden relative aspect-video flex items-center justify-center border-2 border-slate-800 ring-4 ring-slate-900/5 transition-all">
@@ -451,6 +453,7 @@
     const nameplateToggle = document.getElementById('nameplateToggle');
     const nameplateText = document.getElementById('nameplateText');
     const countdownToggle = document.getElementById('countdownToggle');
+    const countdownSecondsSelect = document.getElementById('countdownSecondsSelect');
     const displaySurfaceMode = document.getElementById('displaySurfaceMode');
 
     const previewContainer = document.getElementById('previewContainer');
@@ -505,8 +508,14 @@
     const personCtx = personCanvas.getContext('2d');
 
     countdownToggle.checked = localStorage.getItem('screenRecorderCountdown') !== 'false';
+    countdownSecondsSelect.value = localStorage.getItem('screenRecorderCountdownSeconds') || '3';
+    countdownSecondsSelect.disabled = !countdownToggle.checked;
     countdownToggle.addEventListener('change', () => {
       localStorage.setItem('screenRecorderCountdown', countdownToggle.checked);
+      countdownSecondsSelect.disabled = !countdownToggle.checked;
+    });
+    countdownSecondsSelect.addEventListener('change', () => {
+      localStorage.setItem('screenRecorderCountdownSeconds', countdownSecondsSelect.value);
     });
 
     function syncDeviceSelectStates() {
@@ -528,8 +537,10 @@
       if (cameraShapeSelect.value === 'square') webcamContainer.classList.add('shape-square');
       if (cameraBorderSelect.value !== 'white') webcamContainer.classList.add(`border-${cameraBorderSelect.value}`);
       const borderWidth = cameraBorderSelect.value === 'none' ? 0 : Number(cameraBorderWidthSelect.value);
+      const borderColors = { white: '#ffffff', blue: '#3b82f6', amber: '#f59e0b', none: 'transparent' };
       webcamContainer.style.borderWidth = `${borderWidth}px`;
       webcamContainer.style.borderStyle = borderWidth ? 'solid' : 'none';
+      webcamContainer.style.borderColor = borderColors[cameraBorderSelect.value];
       webcamContainer.style.boxShadow = 'none';
     }
 
@@ -739,7 +750,7 @@
           recordingControls.classList.add('hidden');
           downloadSection.classList.remove('flex');
           downloadSection.classList.add('hidden');
-          statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 font-medium text-sm mb-3 transition-colors';
+          statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 font-medium text-sm transition-colors';
           statusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
           statusText.textContent = '等待設定';
           timerDisplay.textContent = '00:00';
@@ -753,7 +764,7 @@
         case 'recording':
           startBtn.classList.add('hidden');
           recordingControls.classList.remove('hidden');
-          statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-100 text-red-600 font-medium text-sm mb-3 transition-colors';
+          statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-100 text-red-600 font-medium text-sm transition-colors';
           statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500 recording-indicator';
           statusText.textContent = '錄影中...';
           document.getElementById('pauseIconWrapper').innerHTML = '<i data-lucide="pause" class="w-5 h-5"></i>';
@@ -770,14 +781,14 @@
         case 'preparing':
           startBtn.classList.add('hidden');
           recordingControls.classList.add('hidden');
-          statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 font-medium text-sm mb-3 transition-colors';
+          statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 font-medium text-sm transition-colors';
           statusDot.className = 'w-2.5 h-2.5 rounded-full bg-blue-500';
           statusText.textContent = '準備錄影...';
           videoPlaceholder.classList.add('hidden');
           previewContainer.classList.remove('hidden');
           break;
         case 'paused':
-          statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 text-amber-700 font-medium text-sm mb-3 transition-colors';
+          statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 font-medium text-sm transition-colors';
           statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
           statusText.textContent = '已暫停';
           document.getElementById('pauseIconWrapper').innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
@@ -787,7 +798,7 @@
         case 'finished':
           startBtn.classList.add('hidden');
           recordingControls.classList.add('hidden');
-          statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-medium text-sm mb-3 transition-colors';
+          statusBadge.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-medium text-sm transition-colors';
           statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
           statusText.textContent = '錄製完成';
           previewContainer.classList.add('hidden');
@@ -809,7 +820,8 @@
       countdownOverlay.classList.remove('hidden');
       countdownOverlay.classList.add('flex');
 
-      for (let count = 3; count >= 1; count--) {
+      const countdownSeconds = Number(countdownSecondsSelect.value);
+      for (let count = countdownSeconds; count >= 1; count--) {
         if (countdownCancelled) return false;
         countdownNumber.textContent = count;
         await wait(1000);
