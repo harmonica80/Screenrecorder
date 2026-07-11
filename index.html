@@ -162,6 +162,10 @@
       transform: translate(-50%, -50%);
     }
 
+    .settings-panel.panel-collapsed > :not(:first-child) {
+      display: none !important;
+    }
+
     /* 隱藏的合成畫布 */
     #compositingCanvas {
       display: none;
@@ -272,13 +276,18 @@
         </div>
 
         <!-- 影片浮水印 -->
-        <div class="mb-5 p-3.5 border border-cyan-100 bg-cyan-50/40 rounded-xl space-y-3">
+        <div id="watermarkPanel" class="settings-panel mb-5 p-3.5 border border-cyan-100 bg-cyan-50/40 rounded-xl space-y-3">
           <label class="flex items-center justify-between gap-3 cursor-pointer">
             <span>
               <span class="block font-medium text-sm text-slate-800">影片浮水印</span>
               <span class="block text-xs text-slate-500">預設顯示錄影日期與時間</span>
             </span>
-            <input id="watermarkToggle" type="checkbox" class="accent-cyan-600" checked>
+            <span class="flex items-center gap-2">
+              <input id="watermarkToggle" type="checkbox" class="accent-cyan-600" checked>
+              <button id="watermarkPanelToggle" type="button" aria-expanded="true"
+                class="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-cyan-200 text-cyan-700 hover:bg-cyan-100"
+                onclick="event.preventDefault(); event.stopPropagation();">收合</button>
+            </span>
           </label>
           <div id="watermarkControls" class="space-y-3">
             <div class="grid grid-cols-2 gap-2">
@@ -415,15 +424,19 @@
           </div>
 
           <!-- 攝影機子母畫面控制 -->
-          <div id="cameraControls" class="p-3.5 border border-emerald-100 bg-emerald-50/40 rounded-xl space-y-3 opacity-50 pointer-events-none">
+          <div id="cameraControls" class="settings-panel p-3.5 border border-emerald-100 bg-emerald-50/40 rounded-xl space-y-3 opacity-50">
             <div class="flex items-center justify-between gap-3">
               <div>
                 <p class="font-medium text-sm text-slate-800">子母畫面樣式</p>
                 <p class="text-xs text-slate-500">外觀設定會一併錄入影片</p>
               </div>
-              <button id="cameraVisibilityBtn" type="button" class="shrink-0 px-3 py-2 text-xs rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                隱藏畫面
-              </button>
+              <div class="flex items-center gap-2">
+                <button id="cameraVisibilityBtn" type="button" class="shrink-0 px-3 py-2 text-xs rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                  隱藏畫面
+                </button>
+                <button id="cameraPanelToggle" type="button" aria-expanded="true"
+                  class="shrink-0 px-3 py-2 text-xs rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100">收合</button>
+              </div>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <label class="text-xs text-slate-600">大小
@@ -626,6 +639,7 @@
     const micDeviceSelect = document.getElementById('micDeviceSelect');
     const cameraDeviceSelect = document.getElementById('cameraDeviceSelect');
     const cameraControls = document.getElementById('cameraControls');
+    const cameraPanelToggle = document.getElementById('cameraPanelToggle');
     const cameraVisibilityBtn = document.getElementById('cameraVisibilityBtn');
     const cameraSizeSelect = document.getElementById('cameraSizeSelect');
     const cameraShapeSelect = document.getElementById('cameraShapeSelect');
@@ -659,6 +673,8 @@
     const cursorHighlightOpacityValue = document.getElementById('cursorHighlightOpacityValue');
     const cursorHighlightOverlay = document.getElementById('cursorHighlightOverlay');
     const watermarkToggle = document.getElementById('watermarkToggle');
+    const watermarkPanel = document.getElementById('watermarkPanel');
+    const watermarkPanelToggle = document.getElementById('watermarkPanelToggle');
     const watermarkControls = document.getElementById('watermarkControls');
     const watermarkTypeSelect = document.getElementById('watermarkTypeSelect');
     const watermarkSizeSelect = document.getElementById('watermarkSizeSelect');
@@ -719,6 +735,26 @@
     let recordingStartedAt = null;
     let watermarkImageUrl = null;
     const watermarkImage = new Image();
+    let segmentationLoopId = null;
+
+    cameraControls.after(watermarkPanel);
+
+    function setupCollapsiblePanel(panel, button, storageKey) {
+      const applyState = collapsed => {
+        panel.classList.toggle('panel-collapsed', collapsed);
+        button.textContent = collapsed ? '展開' : '收合';
+        button.setAttribute('aria-expanded', String(!collapsed));
+        localStorage.setItem(storageKey, String(collapsed));
+      };
+      applyState(localStorage.getItem(storageKey) === 'true');
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyState(!panel.classList.contains('panel-collapsed'));
+      });
+    }
+    setupCollapsiblePanel(cameraControls, cameraPanelToggle, 'screenRecorderCameraPanelCollapsed');
+    setupCollapsiblePanel(watermarkPanel, watermarkPanelToggle, 'screenRecorderWatermarkPanelCollapsed');
     let isCameraVisible = true;
     let selfieSegmentation = null;
     let segmentationMask = null;
@@ -942,7 +978,6 @@
       micDeviceSelect.disabled = !micToggle.checked;
       cameraDeviceSelect.disabled = !cameraToggle.checked;
       cameraControls.classList.toggle('opacity-50', !cameraToggle.checked);
-      cameraControls.classList.toggle('pointer-events-none', !cameraToggle.checked);
     }
 
     micToggle.addEventListener('change', syncDeviceSelectStates);
@@ -998,10 +1033,16 @@
     });
     function applyBackgroundEffect() {
       const hasEffect = backgroundEffectSelect.value !== 'none';
-      webcamVideo.style.visibility = hasEffect ? 'hidden' : 'visible';
-      webcamEffectCanvas.style.display = hasEffect ? 'block' : 'none';
+      const hasProcessedFrame = webcamEffectCanvas.width > 0 && webcamEffectCanvas.height > 0;
+      webcamVideo.style.visibility = hasEffect && hasProcessedFrame ? 'hidden' : 'visible';
+      webcamEffectCanvas.style.display = hasEffect && hasProcessedFrame ? 'block' : 'none';
       webcamContainer.style.background = backgroundEffectSelect.value === 'remove' ? 'transparent' : '#000';
-      if (hasEffect) initSelfieSegmentation();
+      if (hasEffect) {
+        initSelfieSegmentation();
+        startSegmentationLoop();
+      } else {
+        stopSegmentationLoop();
+      }
     }
     backgroundEffectSelect.addEventListener('change', applyBackgroundEffect);
     applyCameraAppearance();
@@ -1024,6 +1065,8 @@
       selfieSegmentation.onResults(results => {
         segmentationMask = results.segmentationMask;
         renderEffectPreview(results);
+        webcamVideo.style.visibility = 'hidden';
+        webcamEffectCanvas.style.display = 'block';
         isSegmenting = false;
       });
     }
@@ -1057,7 +1100,25 @@
     function updateSegmentation() {
       if (backgroundEffectSelect.value === 'none' || !selfieSegmentation || isSegmenting || webcamVideo.readyState < 2) return;
       isSegmenting = true;
-      selfieSegmentation.send({ image: webcamVideo }).catch(() => { isSegmenting = false; });
+      selfieSegmentation.send({ image: webcamVideo }).catch(error => {
+        console.warn('人像分割處理失敗，暫時回復原始畫面：', error);
+        isSegmenting = false;
+        webcamVideo.style.visibility = 'visible';
+        webcamEffectCanvas.style.display = 'none';
+      });
+    }
+
+    function startSegmentationLoop() {
+      stopSegmentationLoop();
+      if (!cameraStream || backgroundEffectSelect.value === 'none') return;
+      updateSegmentation();
+      segmentationLoopId = setInterval(updateSegmentation, 100);
+    }
+
+    function stopSegmentationLoop() {
+      if (segmentationLoopId) clearInterval(segmentationLoopId);
+      segmentationLoopId = null;
+      isSegmenting = false;
     }
 
     function roundedRectPath(context, x, y, width, height, radius) {
@@ -1202,6 +1263,10 @@
         });
         webcamVideo.srcObject = cameraStream;
         await webcamVideo.play().catch(() => {});
+        webcamEffectCanvas.width = 0;
+        webcamEffectCanvas.height = 0;
+        webcamEffectCanvas.style.display = 'none';
+        webcamVideo.style.visibility = 'visible';
         previewContainer.classList.remove('hidden');
         videoPlaceholder.classList.add('hidden');
         webcamContainer.style.display = 'block';
@@ -1229,6 +1294,7 @@
     }
 
     function stopCameraPreview() {
+      stopSegmentationLoop();
       if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
       cameraStream = null;
       webcamVideo.srcObject = null;
@@ -1449,7 +1515,6 @@
           const drawW = relW * canvas.width;
           const drawH = relH * canvas.height;
 
-          updateSegmentation();
           const isCircle = cameraShapeSelect.value === 'circle';
           const radius = isCircle ? Math.min(drawW, drawH) / 2 : (cameraShapeSelect.value === 'rounded' ? 18 : 0);
 
@@ -1675,6 +1740,7 @@
 
     // 清理所有 MediaTracks
     function stopMediaTracks() {
+      stopSegmentationLoop();
       if (screenStream) screenStream.getTracks().forEach(t => t.stop());
       if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
       if (micStream) micStream.getTracks().forEach(t => t.stop());
