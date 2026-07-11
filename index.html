@@ -236,12 +236,12 @@
             <div class="grid grid-cols-2 gap-2">
               <label class="text-xs text-slate-600">大小
                 <select id="cameraSizeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
-                  <option value="small">小</option><option value="medium" selected>中</option><option value="large">大</option>
+                  <option value="small" selected>小</option><option value="medium">中</option><option value="large">大</option>
                 </select>
               </label>
               <label class="text-xs text-slate-600">形狀
                 <select id="cameraShapeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
-                  <option value="rounded" selected>圓角</option><option value="circle">圓形</option><option value="square">方形</option>
+                  <option value="rounded">圓角</option><option value="circle" selected>圓形</option><option value="square">方形</option>
                 </select>
               </label>
               <label class="text-xs text-slate-600">外框
@@ -254,11 +254,16 @@
                   <option value="none" selected>原始背景</option><option value="blur">模糊背景</option><option value="remove">自動去背</option>
                 </select>
               </label>
+              <label class="text-xs text-slate-600">外框粗細
+                <select id="cameraBorderWidthSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="4">細（1 倍）</option><option value="8">中（2 倍）</option><option value="16" selected>粗（4 倍）</option><option value="24">特粗（6 倍）</option>
+                </select>
+              </label>
             </div>
             <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-              <input id="nameplateToggle" type="checkbox" class="accent-emerald-600"> 顯示姓名牌
+              <input id="nameplateToggle" type="checkbox" class="accent-emerald-600" checked> 顯示姓名牌
             </label>
-            <input id="nameplateText" value="述文老師｜數位教學講師" maxlength="50" disabled
+            <input id="nameplateText" value="述文老師｜數位教學講師" maxlength="50"
               class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 disabled:opacity-50" aria-label="姓名牌文字">
           </div>
         </div>
@@ -418,6 +423,7 @@
     const cameraSizeSelect = document.getElementById('cameraSizeSelect');
     const cameraShapeSelect = document.getElementById('cameraShapeSelect');
     const cameraBorderSelect = document.getElementById('cameraBorderSelect');
+    const cameraBorderWidthSelect = document.getElementById('cameraBorderWidthSelect');
     const backgroundEffectSelect = document.getElementById('backgroundEffectSelect');
     const nameplateToggle = document.getElementById('nameplateToggle');
     const nameplateText = document.getElementById('nameplateText');
@@ -497,7 +503,7 @@
       if (cameraBorderSelect.value !== 'white') webcamContainer.classList.add(`border-${cameraBorderSelect.value}`);
     }
 
-    [cameraSizeSelect, cameraShapeSelect, cameraBorderSelect].forEach(control => {
+    [cameraSizeSelect, cameraShapeSelect, cameraBorderSelect, cameraBorderWidthSelect].forEach(control => {
       control.addEventListener('change', applyCameraAppearance);
     });
     nameplateToggle.addEventListener('change', () => { nameplateText.disabled = !nameplateToggle.checked; });
@@ -790,7 +796,7 @@
           ctx.shadowBlur = 20;
           ctx.shadowOffsetX = 5;
           ctx.shadowOffsetY = 10;
-          ctx.lineWidth = 4;
+          ctx.lineWidth = Number(cameraBorderWidthSelect.value);
           ctx.strokeStyle = { white: '#fff', blue: '#3b82f6', amber: '#f59e0b' }[cameraBorderSelect.value] || 'transparent';
           roundedRectPath(ctx, drawX, drawY, drawW, drawH, radius);
           ctx.clip();
@@ -816,7 +822,7 @@
           ctx.restore();
           if (cameraBorderSelect.value !== 'none') {
             ctx.save();
-            ctx.lineWidth = 4;
+            ctx.lineWidth = Number(cameraBorderWidthSelect.value);
             ctx.strokeStyle = { white: '#fff', blue: '#3b82f6', amber: '#f59e0b' }[cameraBorderSelect.value];
             roundedRectPath(ctx, drawX, drawY, drawW, drawH, radius);
             ctx.stroke();
