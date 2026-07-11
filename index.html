@@ -149,19 +149,6 @@
       object-fit: contain;
     }
 
-    #cursorHighlightOverlay {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 9999;
-      display: none;
-      transform: translate(-50%, -50%);
-    }
-
     .settings-panel.panel-collapsed > :not(:first-child) {
       display: none !important;
     }
@@ -174,7 +161,6 @@
 </head>
 
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col m-0 p-0">
-  <div id="cursorHighlightOverlay" aria-hidden="true"></div>
 
   <header
     class="w-full bg-white shadow-sm border-b border-slate-200 py-4 px-6 md:px-12 flex justify-between items-center z-10">
@@ -246,31 +232,6 @@
             </label>
             <label class="text-xs text-slate-600">停止錄影
               <input id="stopHotkeyInput" value="F10" readonly class="hotkey-input mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-center text-slate-700 cursor-pointer">
-            </label>
-          </div>
-        </div>
-
-        <!-- 網頁內游標顯目效果 -->
-        <div class="mb-5 p-3.5 border border-yellow-100 bg-yellow-50/50 rounded-xl space-y-3">
-          <label class="flex items-center justify-between gap-3 cursor-pointer">
-            <span>
-              <span class="block font-medium text-sm text-slate-800">滑鼠游標顯目效果</span>
-              <span class="block text-xs text-slate-500">適用於錄製本網頁或分頁內操作</span>
-            </span>
-            <input id="cursorHighlightToggle" type="checkbox" class="accent-yellow-500">
-          </label>
-          <div id="cursorHighlightControls" class="grid grid-cols-2 gap-2 opacity-50 pointer-events-none">
-            <label class="text-xs text-slate-600">顏色
-              <input id="cursorHighlightColor" type="color" value="#ffff00" class="mt-1 w-full h-9 bg-white border border-slate-200 rounded-lg p-1 cursor-pointer">
-            </label>
-            <label class="text-xs text-slate-600">大小：<span id="cursorHighlightSizeValue">90px</span>
-              <input id="cursorHighlightSize" type="range" min="30" max="180" value="90" class="mt-2 w-full accent-yellow-500">
-            </label>
-            <label class="text-xs text-slate-600">柔邊：<span id="cursorHighlightSoftnessValue">20px</span>
-              <input id="cursorHighlightSoftness" type="range" min="0" max="60" value="20" class="mt-2 w-full accent-yellow-500">
-            </label>
-            <label class="text-xs text-slate-600">不透明度：<span id="cursorHighlightOpacityValue">60%</span>
-              <input id="cursorHighlightOpacity" type="range" min="10" max="100" value="60" class="mt-2 w-full accent-yellow-500">
             </label>
           </div>
         </div>
@@ -662,16 +623,6 @@
     const recordHotkeyInput = document.getElementById('recordHotkeyInput');
     const pauseHotkeyInput = document.getElementById('pauseHotkeyInput');
     const stopHotkeyInput = document.getElementById('stopHotkeyInput');
-    const cursorHighlightToggle = document.getElementById('cursorHighlightToggle');
-    const cursorHighlightControls = document.getElementById('cursorHighlightControls');
-    const cursorHighlightColor = document.getElementById('cursorHighlightColor');
-    const cursorHighlightSize = document.getElementById('cursorHighlightSize');
-    const cursorHighlightSizeValue = document.getElementById('cursorHighlightSizeValue');
-    const cursorHighlightSoftness = document.getElementById('cursorHighlightSoftness');
-    const cursorHighlightSoftnessValue = document.getElementById('cursorHighlightSoftnessValue');
-    const cursorHighlightOpacity = document.getElementById('cursorHighlightOpacity');
-    const cursorHighlightOpacityValue = document.getElementById('cursorHighlightOpacityValue');
-    const cursorHighlightOverlay = document.getElementById('cursorHighlightOverlay');
     const watermarkToggle = document.getElementById('watermarkToggle');
     const watermarkPanel = document.getElementById('watermarkPanel');
     const watermarkPanelToggle = document.getElementById('watermarkPanelToggle');
@@ -746,15 +697,15 @@
         button.setAttribute('aria-expanded', String(!collapsed));
         localStorage.setItem(storageKey, String(collapsed));
       };
-      applyState(localStorage.getItem(storageKey) === 'true');
+      applyState(localStorage.getItem(storageKey) !== 'false');
       button.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
         applyState(!panel.classList.contains('panel-collapsed'));
       });
     }
-    setupCollapsiblePanel(cameraControls, cameraPanelToggle, 'screenRecorderCameraPanelCollapsed');
-    setupCollapsiblePanel(watermarkPanel, watermarkPanelToggle, 'screenRecorderWatermarkPanelCollapsed');
+    setupCollapsiblePanel(cameraControls, cameraPanelToggle, 'screenRecorderCameraPanelCollapsedV2');
+    setupCollapsiblePanel(watermarkPanel, watermarkPanelToggle, 'screenRecorderWatermarkPanelCollapsedV2');
     let isCameraVisible = true;
     let selfieSegmentation = null;
     let segmentationMask = null;
@@ -852,37 +803,6 @@
         startRecording();
       }
     });
-
-    function updateCursorHighlightSettings() {
-      const enabled = cursorHighlightToggle.checked;
-      cursorHighlightControls.classList.toggle('opacity-50', !enabled);
-      cursorHighlightControls.classList.toggle('pointer-events-none', !enabled);
-      const size = Number(cursorHighlightSize.value);
-      const softness = Number(cursorHighlightSoftness.value);
-      const opacity = Number(cursorHighlightOpacity.value) / 100;
-      cursorHighlightSizeValue.textContent = `${size}px`;
-      cursorHighlightSoftnessValue.textContent = `${softness}px`;
-      cursorHighlightOpacityValue.textContent = `${cursorHighlightOpacity.value}%`;
-      cursorHighlightOverlay.style.width = `${size}px`;
-      cursorHighlightOverlay.style.height = `${size}px`;
-      cursorHighlightOverlay.style.backgroundColor = hexToRgba(cursorHighlightColor.value, opacity);
-      cursorHighlightOverlay.style.boxShadow = `0 0 ${softness}px ${Math.round(softness / 3)}px ${hexToRgba(cursorHighlightColor.value, opacity * 0.7)}`;
-      if (!enabled) cursorHighlightOverlay.style.display = 'none';
-    }
-    [cursorHighlightToggle, cursorHighlightColor, cursorHighlightSize, cursorHighlightSoftness, cursorHighlightOpacity]
-      .forEach(control => {
-        control.addEventListener('input', updateCursorHighlightSettings);
-        control.addEventListener('change', updateCursorHighlightSettings);
-      });
-    document.addEventListener('pointermove', event => {
-      if (!cursorHighlightToggle.checked) return;
-      cursorHighlightOverlay.style.left = `${event.clientX}px`;
-      cursorHighlightOverlay.style.top = `${event.clientY}px`;
-      cursorHighlightOverlay.style.display = 'block';
-    });
-    document.addEventListener('pointerleave', () => { cursorHighlightOverlay.style.display = 'none'; });
-    window.addEventListener('blur', () => { cursorHighlightOverlay.style.display = 'none'; });
-    updateCursorHighlightSettings();
 
     function formatWatermarkDateTime(date) {
       const year = date.getFullYear();
