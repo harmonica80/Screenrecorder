@@ -56,7 +56,6 @@
       right: 20px;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
       border: 2px solid rgba(255, 255, 255, 0.8);
       cursor: grab;
       z-index: 50;
@@ -87,6 +86,22 @@
       position: absolute;
       inset: 0;
       display: none;
+    }
+
+    #webcamNameplate {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      padding: 6px 8px;
+      color: #fff;
+      background: rgba(15, 23, 42, 0.86);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-align: center;
+      pointer-events: none;
     }
 
     /* 隱藏的合成畫布 */
@@ -339,6 +354,7 @@
           <div id="webcamContainer">
             <video id="webcamVideo" autoplay muted playsinline></video>
             <canvas id="webcamEffectCanvas"></canvas>
+            <div id="webcamNameplate">述文老師｜數位教學講師</div>
           </div>
         </div>
 
@@ -443,6 +459,7 @@
     const webcamVideo = document.getElementById('webcamVideo');
     const webcamEffectCanvas = document.getElementById('webcamEffectCanvas');
     const webcamEffectCtx = webcamEffectCanvas.getContext('2d');
+    const webcamNameplate = document.getElementById('webcamNameplate');
     const playbackVideo = document.getElementById('playbackVideo');
     const videoPlaceholder = document.getElementById('videoPlaceholder');
     const videoArea = document.getElementById('videoArea');
@@ -510,12 +527,22 @@
       if (cameraShapeSelect.value === 'circle') webcamContainer.classList.add('shape-circle');
       if (cameraShapeSelect.value === 'square') webcamContainer.classList.add('shape-square');
       if (cameraBorderSelect.value !== 'white') webcamContainer.classList.add(`border-${cameraBorderSelect.value}`);
+      const borderWidth = cameraBorderSelect.value === 'none' ? 0 : Number(cameraBorderWidthSelect.value);
+      webcamContainer.style.borderWidth = `${borderWidth}px`;
+      webcamContainer.style.borderStyle = borderWidth ? 'solid' : 'none';
+      webcamContainer.style.boxShadow = 'none';
     }
 
     [cameraSizeSelect, cameraShapeSelect, cameraBorderSelect, cameraBorderWidthSelect].forEach(control => {
       control.addEventListener('change', applyCameraAppearance);
     });
-    nameplateToggle.addEventListener('change', () => { nameplateText.disabled = !nameplateToggle.checked; });
+    function syncNameplatePreview() {
+      nameplateText.disabled = !nameplateToggle.checked;
+      webcamNameplate.hidden = !nameplateToggle.checked || !nameplateText.value.trim();
+      webcamNameplate.textContent = nameplateText.value.trim();
+    }
+    nameplateToggle.addEventListener('change', syncNameplatePreview);
+    nameplateText.addEventListener('input', syncNameplatePreview);
     cameraVisibilityBtn.addEventListener('click', () => {
       isCameraVisible = !isCameraVisible;
       webcamContainer.style.visibility = isCameraVisible ? 'visible' : 'hidden';
@@ -530,6 +557,7 @@
     }
     backgroundEffectSelect.addEventListener('change', applyBackgroundEffect);
     applyCameraAppearance();
+    syncNameplatePreview();
 
     function initSelfieSegmentation() {
       if (selfieSegmentation || typeof SelfieSegmentation === 'undefined') return;
@@ -833,10 +861,6 @@
           const radius = isCircle ? Math.min(drawW, drawH) / 2 : (cameraShapeSelect.value === 'rounded' ? 18 : 0);
 
           ctx.save();
-          ctx.shadowColor = "rgba(0,0,0,0.5)";
-          ctx.shadowBlur = 20;
-          ctx.shadowOffsetX = 5;
-          ctx.shadowOffsetY = 10;
           ctx.lineWidth = Number(cameraBorderWidthSelect.value);
           ctx.strokeStyle = { white: '#fff', blue: '#3b82f6', amber: '#f59e0b' }[cameraBorderSelect.value] || 'transparent';
           roundedRectPath(ctx, drawX, drawY, drawW, drawH, radius);
