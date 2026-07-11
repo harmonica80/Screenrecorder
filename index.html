@@ -364,6 +364,19 @@
                   onclick="event.stopPropagation()">
                   <option value="">系統預設攝影機</option>
                 </select>
+                <div class="mt-2 grid grid-cols-2 gap-2" onclick="event.stopPropagation()">
+                  <label class="text-xs text-slate-500">攝影機品質
+                    <select id="cameraQualitySelect" aria-label="攝影機品質"
+                      class="mt-1 w-full bg-white border border-slate-200 text-slate-700 py-1.5 px-2 rounded-lg text-xs cursor-pointer">
+                      <option value="standard">標準（720p／30fps）</option>
+                      <option value="high" selected>高畫質（1080p／30fps）</option>
+                      <option value="smooth">流暢（720p／60fps）</option>
+                    </select>
+                  </label>
+                  <div class="text-xs text-slate-500">實際輸入
+                    <p id="cameraQualityStatus" class="mt-1 rounded-lg bg-white border border-slate-200 py-1.5 px-2 text-slate-600 whitespace-nowrap">尚未開啟</p>
+                  </div>
+                </div>
               </div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer" onclick="event.stopPropagation()">
@@ -432,6 +445,11 @@
               <label class="text-xs text-slate-600">背景效果
                 <select id="backgroundEffectSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
                   <option value="none" selected>原始背景</option><option value="blur">模糊背景</option><option value="remove">自動去背</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">去背品質
+                <select id="segmentationQualitySelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="performance">效能優先</option><option value="quality" selected>品質優先</option>
                 </select>
               </label>
               <label class="text-xs text-slate-600">外框粗細
@@ -613,6 +631,8 @@
     const cameraToggle = document.getElementById('cameraToggle');
     const micDeviceSelect = document.getElementById('micDeviceSelect');
     const cameraDeviceSelect = document.getElementById('cameraDeviceSelect');
+    const cameraQualitySelect = document.getElementById('cameraQualitySelect');
+    const cameraQualityStatus = document.getElementById('cameraQualityStatus');
     const cameraControls = document.getElementById('cameraControls');
     const cameraPanelToggle = document.getElementById('cameraPanelToggle');
     const cameraVisibilityBtn = document.getElementById('cameraVisibilityBtn');
@@ -621,6 +641,7 @@
     const cameraBorderSelect = document.getElementById('cameraBorderSelect');
     const cameraBorderWidthSelect = document.getElementById('cameraBorderWidthSelect');
     const backgroundEffectSelect = document.getElementById('backgroundEffectSelect');
+    const segmentationQualitySelect = document.getElementById('segmentationQualitySelect');
     const nameplateToggle = document.getElementById('nameplateToggle');
     const nameplateText = document.getElementById('nameplateText');
     const nameplateStyleSelect = document.getElementById('nameplateStyleSelect');
@@ -730,6 +751,8 @@
     const personCtx = personCanvas.getContext('2d');
 
     countdownToggle.checked = localStorage.getItem('screenRecorderCountdown') !== 'false';
+    cameraQualitySelect.value = localStorage.getItem('screenRecorderCameraQuality') || 'high';
+    segmentationQualitySelect.value = localStorage.getItem('screenRecorderSegmentationQuality') || 'quality';
     countdownSecondsSelect.value = localStorage.getItem('screenRecorderCountdownSeconds') || '3';
     countdownSecondsSelect.disabled = !countdownToggle.checked;
     countdownToggle.addEventListener('change', () => {
@@ -952,6 +975,7 @@
     function syncDeviceSelectStates() {
       micDeviceSelect.disabled = !micToggle.checked;
       cameraDeviceSelect.disabled = !cameraToggle.checked;
+      cameraQualitySelect.disabled = !cameraToggle.checked;
       cameraControls.classList.toggle('opacity-50', !cameraToggle.checked);
     }
 
@@ -1020,6 +1044,10 @@
       }
     }
     backgroundEffectSelect.addEventListener('change', applyBackgroundEffect);
+    segmentationQualitySelect.addEventListener('change', () => {
+      localStorage.setItem('screenRecorderSegmentationQuality', segmentationQualitySelect.value);
+      if (backgroundEffectSelect.value !== 'none') startSegmentationLoop();
+    });
     applyCameraAppearance();
     syncNameplatePreview();
 
@@ -1087,7 +1115,8 @@
       stopSegmentationLoop();
       if (!cameraStream || backgroundEffectSelect.value === 'none') return;
       updateSegmentation();
-      segmentationLoopId = setInterval(updateSegmentation, 100);
+      // 品質優先提供較密集的遮罩更新；效能優先降低 CPU 使用量。
+      segmentationLoopId = setInterval(updateSegmentation, segmentationQualitySelect.value === 'quality' ? 50 : 125);
     }
 
     function stopSegmentationLoop() {
@@ -1224,6 +1253,35 @@
     cameraDeviceSelect.addEventListener('change', async () => {
       if (cameraToggle.checked) await startCameraPreview(false);
     });
+    cameraQualitySelect.addEventListener('change', async () => {
+      localStorage.setItem('screenRecorderCameraQuality', cameraQualitySelect.value);
+      if (cameraToggle.checked) await startCameraPreview(false);
+    });
+
+    function getCameraConstraints() {
+      const profiles = {
+        standard: { width: 1280, height: 720, frameRate: 30 },
+        high: { width: 1920, height: 1080, frameRate: 30 },
+        smooth: { width: 1280, height: 720, frameRate: 60 }
+      };
+      const profile = profiles[cameraQualitySelect.value] || profiles.high;
+      return {
+        width: { ideal: profile.width },
+        height: { ideal: profile.height },
+        frameRate: { ideal: profile.frameRate, max: profile.frameRate }
+      };
+    }
+
+    function updateCameraQualityStatus() {
+      const track = cameraStream?.getVideoTracks?.()[0];
+      const settings = track?.getSettings?.();
+      if (!settings?.width || !settings?.height) {
+        cameraQualityStatus.textContent = '無法取得裝置資訊';
+        return;
+      }
+      const fps = settings.frameRate ? `${Math.round(settings.frameRate)}fps` : 'fps 未回報';
+      cameraQualityStatus.textContent = `${settings.width} × ${settings.height}／${fps}`;
+    }
 
     async function startCameraPreview(resetPosition = false) {
       try {
@@ -1231,13 +1289,13 @@
         const selectedCameraId = cameraDeviceSelect.value;
         cameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            ...getCameraConstraints(),
             ...(selectedCameraId && { deviceId: { exact: selectedCameraId } })
           }
         });
         webcamVideo.srcObject = cameraStream;
         await webcamVideo.play().catch(() => {});
+        updateCameraQualityStatus();
         webcamEffectCanvas.width = 0;
         webcamEffectCanvas.height = 0;
         webcamEffectCanvas.style.display = 'none';
@@ -1273,6 +1331,7 @@
       if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
       cameraStream = null;
       webcamVideo.srcObject = null;
+      cameraQualityStatus.textContent = '尚未開啟';
       webcamContainer.style.display = 'none';
       if (!screenStream) {
         previewContainer.classList.add('hidden');
