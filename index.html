@@ -7,6 +7,7 @@
   <title>純前端線上螢幕錄影工具 | Local Screen Recorder Pro</title>
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js"></script>
   <style>
     @keyframes pulse-ring {
       0% {
@@ -68,6 +69,12 @@
       cursor: grabbing;
       border-color: #3b82f6;
     }
+
+    #webcamContainer.shape-circle { border-radius: 50%; aspect-ratio: 1; }
+    #webcamContainer.shape-square { border-radius: 0; }
+    #webcamContainer.border-none { border-color: transparent; }
+    #webcamContainer.border-blue { border-color: #3b82f6; }
+    #webcamContainer.border-amber { border-color: #f59e0b; }
 
     #webcamVideo {
       width: 100%;
@@ -213,6 +220,46 @@
                 class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500">
               </div>
             </label>
+          </div>
+
+          <!-- 攝影機子母畫面控制 -->
+          <div id="cameraControls" class="p-3.5 border border-emerald-100 bg-emerald-50/40 rounded-xl space-y-3 opacity-50 pointer-events-none">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="font-medium text-sm text-slate-800">子母畫面樣式</p>
+                <p class="text-xs text-slate-500">外觀設定會一併錄入影片</p>
+              </div>
+              <button id="cameraVisibilityBtn" type="button" class="shrink-0 px-3 py-2 text-xs rounded-lg bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                隱藏畫面
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="text-xs text-slate-600">大小
+                <select id="cameraSizeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="small">小</option><option value="medium" selected>中</option><option value="large">大</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">形狀
+                <select id="cameraShapeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="rounded" selected>圓角</option><option value="circle">圓形</option><option value="square">方形</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">外框
+                <select id="cameraBorderSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="white" selected>白色</option><option value="blue">藍色</option><option value="amber">橘色</option><option value="none">無外框</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">背景效果
+                <select id="backgroundEffectSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="none" selected>原始背景</option><option value="blur">模糊背景</option><option value="remove">自動去背</option>
+                </select>
+              </label>
+            </div>
+            <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+              <input id="nameplateToggle" type="checkbox" class="accent-emerald-600"> 顯示姓名牌
+            </label>
+            <input id="nameplateText" value="述文老師｜數位教學講師" maxlength="50" disabled
+              class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 disabled:opacity-50" aria-label="姓名牌文字">
           </div>
         </div>
 
@@ -366,6 +413,14 @@
     const cameraToggle = document.getElementById('cameraToggle');
     const micDeviceSelect = document.getElementById('micDeviceSelect');
     const cameraDeviceSelect = document.getElementById('cameraDeviceSelect');
+    const cameraControls = document.getElementById('cameraControls');
+    const cameraVisibilityBtn = document.getElementById('cameraVisibilityBtn');
+    const cameraSizeSelect = document.getElementById('cameraSizeSelect');
+    const cameraShapeSelect = document.getElementById('cameraShapeSelect');
+    const cameraBorderSelect = document.getElementById('cameraBorderSelect');
+    const backgroundEffectSelect = document.getElementById('backgroundEffectSelect');
+    const nameplateToggle = document.getElementById('nameplateToggle');
+    const nameplateText = document.getElementById('nameplateText');
     const countdownToggle = document.getElementById('countdownToggle');
     const displaySurfaceMode = document.getElementById('displaySurfaceMode');
 
@@ -410,6 +465,12 @@
     let animationFrameId = null;
     let isPreparing = false;
     let countdownCancelled = false;
+    let isCameraVisible = true;
+    let selfieSegmentation = null;
+    let segmentationMask = null;
+    let isSegmenting = false;
+    const personCanvas = document.createElement('canvas');
+    const personCtx = personCanvas.getContext('2d');
 
     countdownToggle.checked = localStorage.getItem('screenRecorderCountdown') !== 'false';
     countdownToggle.addEventListener('change', () => {
@@ -419,11 +480,65 @@
     function syncDeviceSelectStates() {
       micDeviceSelect.disabled = !micToggle.checked;
       cameraDeviceSelect.disabled = !cameraToggle.checked;
+      cameraControls.classList.toggle('opacity-50', !cameraToggle.checked);
+      cameraControls.classList.toggle('pointer-events-none', !cameraToggle.checked);
     }
 
     micToggle.addEventListener('change', syncDeviceSelectStates);
     cameraToggle.addEventListener('change', syncDeviceSelectStates);
     syncDeviceSelectStates();
+
+    const cameraSizeMap = { small: 150, medium: 200, large: 280 };
+    function applyCameraAppearance() {
+      webcamContainer.style.width = `${cameraSizeMap[cameraSizeSelect.value]}px`;
+      webcamContainer.classList.remove('shape-circle', 'shape-square', 'border-none', 'border-blue', 'border-amber');
+      if (cameraShapeSelect.value === 'circle') webcamContainer.classList.add('shape-circle');
+      if (cameraShapeSelect.value === 'square') webcamContainer.classList.add('shape-square');
+      if (cameraBorderSelect.value !== 'white') webcamContainer.classList.add(`border-${cameraBorderSelect.value}`);
+    }
+
+    [cameraSizeSelect, cameraShapeSelect, cameraBorderSelect].forEach(control => {
+      control.addEventListener('change', applyCameraAppearance);
+    });
+    nameplateToggle.addEventListener('change', () => { nameplateText.disabled = !nameplateToggle.checked; });
+    cameraVisibilityBtn.addEventListener('click', () => {
+      isCameraVisible = !isCameraVisible;
+      webcamContainer.style.visibility = isCameraVisible ? 'visible' : 'hidden';
+      cameraVisibilityBtn.textContent = isCameraVisible ? '隱藏畫面' : '顯示畫面';
+    });
+    backgroundEffectSelect.addEventListener('change', () => {
+      if (backgroundEffectSelect.value !== 'none') initSelfieSegmentation();
+    });
+    applyCameraAppearance();
+
+    function initSelfieSegmentation() {
+      if (selfieSegmentation || typeof SelfieSegmentation === 'undefined') return;
+      selfieSegmentation = new SelfieSegmentation({
+        locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/${file}`
+      });
+      selfieSegmentation.setOptions({ modelSelection: 1 });
+      selfieSegmentation.onResults(results => {
+        segmentationMask = results.segmentationMask;
+        isSegmenting = false;
+      });
+    }
+
+    function updateSegmentation() {
+      if (backgroundEffectSelect.value === 'none' || !selfieSegmentation || isSegmenting || webcamVideo.readyState < 2) return;
+      isSegmenting = true;
+      selfieSegmentation.send({ image: webcamVideo }).catch(() => { isSegmenting = false; });
+    }
+
+    function roundedRectPath(context, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      context.beginPath();
+      context.moveTo(x + r, y);
+      context.arcTo(x + width, y, x + width, y + height, r);
+      context.arcTo(x + width, y + height, x, y + height, r);
+      context.arcTo(x, y + height, x, y, r);
+      context.arcTo(x, y, x + width, y, r);
+      context.closePath();
+    }
 
     async function refreshMediaDevices() {
       if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -649,7 +764,7 @@
         ctx.drawImage(previewVideo, 0, 0, canvas.width, canvas.height);
 
         // 2. 畫上層 (攝影機子母畫面)
-        if (cameraToggle.checked && webcamVideo.videoWidth > 0) {
+        if (cameraToggle.checked && isCameraVisible && webcamVideo.videoWidth > 0) {
           // 計算網頁上相對位置，映射到畫布實際像素上
           const parentRect = previewContainer.getBoundingClientRect();
           const camRect = webcamContainer.getBoundingClientRect();
@@ -666,18 +781,63 @@
           const drawW = relW * canvas.width;
           const drawH = relH * canvas.height;
 
-          // 加一點陰影和圓角視覺效果(非完美圓角，因畫布限制，但加邊框)
+          updateSegmentation();
+          const isCircle = cameraShapeSelect.value === 'circle';
+          const radius = isCircle ? Math.min(drawW, drawH) / 2 : (cameraShapeSelect.value === 'rounded' ? 18 : 0);
+
           ctx.save();
           ctx.shadowColor = "rgba(0,0,0,0.5)";
           ctx.shadowBlur = 20;
           ctx.shadowOffsetX = 5;
           ctx.shadowOffsetY = 10;
           ctx.lineWidth = 4;
-          ctx.strokeStyle = "white";
+          ctx.strokeStyle = { white: '#fff', blue: '#3b82f6', amber: '#f59e0b' }[cameraBorderSelect.value] || 'transparent';
+          roundedRectPath(ctx, drawX, drawY, drawW, drawH, radius);
+          ctx.clip();
 
-          ctx.drawImage(webcamVideo, drawX, drawY, drawW, drawH);
-          ctx.strokeRect(drawX, drawY, drawW, drawH);
+          if (backgroundEffectSelect.value !== 'none' && segmentationMask) {
+            personCanvas.width = webcamVideo.videoWidth;
+            personCanvas.height = webcamVideo.videoHeight;
+            personCtx.clearRect(0, 0, personCanvas.width, personCanvas.height);
+            personCtx.drawImage(segmentationMask, 0, 0, personCanvas.width, personCanvas.height);
+            personCtx.globalCompositeOperation = 'source-in';
+            personCtx.drawImage(webcamVideo, 0, 0, personCanvas.width, personCanvas.height);
+            personCtx.globalCompositeOperation = 'source-over';
+            if (backgroundEffectSelect.value === 'blur') {
+              ctx.filter = 'blur(12px)';
+              ctx.drawImage(webcamVideo, drawX - 12, drawY - 12, drawW + 24, drawH + 24);
+              ctx.filter = 'none';
+            }
+            ctx.drawImage(personCanvas, drawX, drawY, drawW, drawH);
+          } else {
+            ctx.drawImage(webcamVideo, drawX, drawY, drawW, drawH);
+          }
+
           ctx.restore();
+          if (cameraBorderSelect.value !== 'none') {
+            ctx.save();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = { white: '#fff', blue: '#3b82f6', amber: '#f59e0b' }[cameraBorderSelect.value];
+            roundedRectPath(ctx, drawX, drawY, drawW, drawH, radius);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          if (nameplateToggle.checked && nameplateText.value.trim()) {
+            ctx.save();
+            const fontSize = Math.max(14, Math.round(drawW / 13));
+            ctx.font = `600 ${fontSize}px sans-serif`;
+            const text = nameplateText.value.trim();
+            const padding = fontSize * 0.7;
+            const labelWidth = ctx.measureText(text).width + padding * 2;
+            const labelHeight = fontSize * 2.1;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
+            ctx.fillRect(drawX, drawY + drawH - labelHeight, Math.min(labelWidth, drawW), labelHeight);
+            ctx.fillStyle = '#fff';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, drawX + padding, drawY + drawH - labelHeight / 2);
+            ctx.restore();
+          }
         }
       }
 
@@ -718,6 +878,7 @@
                 ...(selectedCameraId && { deviceId: { exact: selectedCameraId } })
               }
             });
+            if (backgroundEffectSelect.value !== 'none') initSelfieSegmentation();
             await refreshMediaDevices();
             webcamVideo.srcObject = cameraStream;
             webcamContainer.style.display = 'block';
@@ -726,6 +887,10 @@
             webcamContainer.style.right = '20px';
             webcamContainer.style.left = 'auto';
             webcamContainer.style.top = 'auto';
+            webcamContainer.style.visibility = 'visible';
+            isCameraVisible = true;
+            cameraVisibilityBtn.textContent = '隱藏畫面';
+            applyCameraAppearance();
           } catch (e) {
             alert("無法存取攝影機，可能是權限被拒絕。");
             cameraToggle.checked = false;
