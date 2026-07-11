@@ -202,8 +202,19 @@
           </div>
         </div>
 
+        <!-- 錄影進階設定（檔名、編碼、快速鍵） -->
+        <div id="recordingAdvancedPanel" class="settings-panel mb-5 p-3.5 border border-slate-200 bg-slate-50/60 rounded-xl space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="font-medium text-sm text-slate-800">錄影進階設定</p>
+              <p class="text-xs text-slate-500">檔案命名、編碼品質與快速鍵</p>
+            </div>
+            <button id="recordingAdvancedPanelToggle" type="button" aria-expanded="false"
+              class="shrink-0 px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">展開</button>
+          </div>
+
         <!-- 錄影檔案命名 -->
-        <div class="mb-5">
+        <div>
           <label class="block text-sm font-medium text-slate-700 mb-2">錄影檔案命名</label>
           <div class="grid grid-cols-3 gap-2">
             <select id="filenameModeSelect"
@@ -218,7 +229,7 @@
         </div>
 
         <!-- 錄影編碼與品質 -->
-        <div class="mb-5 p-3.5 border border-indigo-100 bg-indigo-50/40 rounded-xl">
+        <div class="p-3.5 border border-indigo-100 bg-indigo-50/40 rounded-xl">
           <label class="block text-sm font-medium text-slate-800">錄影編碼與品質
             <select id="encodingPresetSelect" class="mt-2 w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700">
               <option value="auto" selected>自動選擇（依瀏覽器選最適合格式）</option>
@@ -232,7 +243,7 @@
         </div>
 
         <!-- 錄影快速鍵 -->
-        <div class="mb-5 p-3.5 border border-violet-100 bg-violet-50/40 rounded-xl space-y-3">
+        <div class="p-3.5 border border-violet-100 bg-violet-50/40 rounded-xl space-y-3">
           <div>
             <p class="font-medium text-sm text-slate-800">錄影快速鍵</p>
             <p class="text-xs text-slate-500">點選欄位後，直接按下新的按鍵組合</p>
@@ -248,6 +259,7 @@
               <input id="stopHotkeyInput" value="F10" readonly class="hotkey-input mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-center text-slate-700 cursor-pointer">
             </label>
           </div>
+        </div>
         </div>
 
         <!-- 影片浮水印 -->
@@ -657,6 +669,8 @@
     const filenamePreview = document.getElementById('filenamePreview');
     const encodingPresetSelect = document.getElementById('encodingPresetSelect');
     const encodingStatus = document.getElementById('encodingStatus');
+    const recordingAdvancedPanel = document.getElementById('recordingAdvancedPanel');
+    const recordingAdvancedPanelToggle = document.getElementById('recordingAdvancedPanelToggle');
     const recordHotkeyInput = document.getElementById('recordHotkeyInput');
     const pauseHotkeyInput = document.getElementById('pauseHotkeyInput');
     const stopHotkeyInput = document.getElementById('stopHotkeyInput');
@@ -743,6 +757,7 @@
     }
     setupCollapsiblePanel(cameraControls, cameraPanelToggle, 'screenRecorderCameraPanelCollapsedV2');
     setupCollapsiblePanel(watermarkPanel, watermarkPanelToggle, 'screenRecorderWatermarkPanelCollapsedV2');
+    setupCollapsiblePanel(recordingAdvancedPanel, recordingAdvancedPanelToggle, 'screenRecorderAdvancedPanelCollapsedV1');
     let isCameraVisible = true;
     let selfieSegmentation = null;
     let segmentationMask = null;
