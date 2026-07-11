@@ -149,6 +149,19 @@
       object-fit: contain;
     }
 
+    #cursorHighlightOverlay {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      display: none;
+      transform: translate(-50%, -50%);
+    }
+
     /* 隱藏的合成畫布 */
     #compositingCanvas {
       display: none;
@@ -157,6 +170,7 @@
 </head>
 
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col m-0 p-0">
+  <div id="cursorHighlightOverlay" aria-hidden="true"></div>
 
   <header
     class="w-full bg-white shadow-sm border-b border-slate-200 py-4 px-6 md:px-12 flex justify-between items-center z-10">
@@ -211,6 +225,50 @@
               class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
           </div>
           <p class="text-xs text-slate-500 mt-2">檔名預覽：<span id="filenamePreview" class="font-medium text-slate-700">01</span></p>
+        </div>
+
+        <!-- 錄影快速鍵 -->
+        <div class="mb-5 p-3.5 border border-violet-100 bg-violet-50/40 rounded-xl space-y-3">
+          <div>
+            <p class="font-medium text-sm text-slate-800">錄影快速鍵</p>
+            <p class="text-xs text-slate-500">點選欄位後，直接按下新的按鍵組合</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="text-xs text-slate-600">開始錄影
+              <input id="recordHotkeyInput" value="F9" readonly class="hotkey-input mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-center text-slate-700 cursor-pointer">
+            </label>
+            <label class="text-xs text-slate-600">暫停／繼續
+              <input id="pauseHotkeyInput" value="F9" readonly class="hotkey-input mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-center text-slate-700 cursor-pointer">
+            </label>
+            <label class="text-xs text-slate-600">停止錄影
+              <input id="stopHotkeyInput" value="F10" readonly class="hotkey-input mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-center text-slate-700 cursor-pointer">
+            </label>
+          </div>
+        </div>
+
+        <!-- 網頁內游標顯目效果 -->
+        <div class="mb-5 p-3.5 border border-yellow-100 bg-yellow-50/50 rounded-xl space-y-3">
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span>
+              <span class="block font-medium text-sm text-slate-800">滑鼠游標顯目效果</span>
+              <span class="block text-xs text-slate-500">適用於錄製本網頁或分頁內操作</span>
+            </span>
+            <input id="cursorHighlightToggle" type="checkbox" class="accent-yellow-500">
+          </label>
+          <div id="cursorHighlightControls" class="grid grid-cols-2 gap-2 opacity-50 pointer-events-none">
+            <label class="text-xs text-slate-600">顏色
+              <input id="cursorHighlightColor" type="color" value="#ffff00" class="mt-1 w-full h-9 bg-white border border-slate-200 rounded-lg p-1 cursor-pointer">
+            </label>
+            <label class="text-xs text-slate-600">大小：<span id="cursorHighlightSizeValue">90px</span>
+              <input id="cursorHighlightSize" type="range" min="30" max="180" value="90" class="mt-2 w-full accent-yellow-500">
+            </label>
+            <label class="text-xs text-slate-600">柔邊：<span id="cursorHighlightSoftnessValue">20px</span>
+              <input id="cursorHighlightSoftness" type="range" min="0" max="60" value="20" class="mt-2 w-full accent-yellow-500">
+            </label>
+            <label class="text-xs text-slate-600">不透明度：<span id="cursorHighlightOpacityValue">60%</span>
+              <input id="cursorHighlightOpacity" type="range" min="10" max="100" value="60" class="mt-2 w-full accent-yellow-500">
+            </label>
+          </div>
         </div>
 
         <!-- 影片浮水印 -->
@@ -456,6 +514,28 @@
         </div>
         <p id="unsupportedWarning" class="text-red-500 text-xs hidden">⚠️ 請改用電腦版 Chrome 或 Edge</p>
       </div>
+
+      <!-- 錄製完成與下載橫列 -->
+      <div id="downloadSection"
+        class="bg-white rounded-2xl shadow-sm border-2 border-emerald-400/50 px-5 py-3 hidden flex-row items-center justify-between gap-5 relative overflow-hidden">
+        <div class="flex items-center gap-3 min-w-0">
+          <i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 shrink-0"></i>
+          <div class="min-w-0">
+            <h3 class="text-lg font-bold text-slate-800">錄製已順利完成！</h3>
+            <p class="text-xs text-slate-500">影片檔已準備就緒。</p>
+          </div>
+        </div>
+        <div class="flex gap-3 shrink-0">
+          <button id="newRecordBtn"
+            class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors flex items-center gap-2">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 重新錄製
+          </button>
+          <a id="downloadLink"
+            class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/30 flex items-center gap-2 cursor-pointer">
+            <i data-lucide="download" class="w-5 h-5"></i> 下載影片檔
+          </a>
+        </div>
+      </div>
       <!-- 主要畫面容器 -->
       <div id="videoArea"
         class="bg-slate-900 rounded-2xl shadow-xl overflow-hidden relative aspect-video flex items-center justify-center border-2 border-slate-800 ring-4 ring-slate-900/5 transition-all">
@@ -500,31 +580,6 @@
             class="mt-6 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm transition-colors">
             取消錄影
           </button>
-        </div>
-      </div>
-
-      <!-- 下載結果區 -->
-      <div id="downloadSection"
-        class="bg-white rounded-2xl shadow-sm border-2 border-emerald-400/50 p-6 hidden flex-col sm:flex-row items-center justify-between gap-5 relative overflow-hidden">
-        <div
-          class="absolute right-0 top-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2">
-        </div>
-        <div>
-          <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500"></i>
-            錄製已順利完成！
-          </h3>
-          <p class="text-sm text-slate-500 mt-1">您的影片檔已準備就緒，畫面與音訊皆已成功打包。</p>
-        </div>
-        <div class="flex gap-3 w-full sm:w-auto relative z-10">
-          <button id="newRecordBtn"
-            class="flex-1 sm:flex-none px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors flex justify-center items-center gap-2">
-            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 重新錄製
-          </button>
-          <a id="downloadLink"
-            class="flex-1 sm:flex-none px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/30 flex justify-center items-center gap-2 cursor-pointer transform hover:-translate-y-0.5">
-            <i data-lucide="download" class="w-5 h-5"></i> 下載影片檔
-          </a>
         </div>
       </div>
 
@@ -590,6 +645,19 @@
     const filenameModeSelect = document.getElementById('filenameModeSelect');
     const recordingSequenceInput = document.getElementById('recordingSequenceInput');
     const filenamePreview = document.getElementById('filenamePreview');
+    const recordHotkeyInput = document.getElementById('recordHotkeyInput');
+    const pauseHotkeyInput = document.getElementById('pauseHotkeyInput');
+    const stopHotkeyInput = document.getElementById('stopHotkeyInput');
+    const cursorHighlightToggle = document.getElementById('cursorHighlightToggle');
+    const cursorHighlightControls = document.getElementById('cursorHighlightControls');
+    const cursorHighlightColor = document.getElementById('cursorHighlightColor');
+    const cursorHighlightSize = document.getElementById('cursorHighlightSize');
+    const cursorHighlightSizeValue = document.getElementById('cursorHighlightSizeValue');
+    const cursorHighlightSoftness = document.getElementById('cursorHighlightSoftness');
+    const cursorHighlightSoftnessValue = document.getElementById('cursorHighlightSoftnessValue');
+    const cursorHighlightOpacity = document.getElementById('cursorHighlightOpacity');
+    const cursorHighlightOpacityValue = document.getElementById('cursorHighlightOpacityValue');
+    const cursorHighlightOverlay = document.getElementById('cursorHighlightOverlay');
     const watermarkToggle = document.getElementById('watermarkToggle');
     const watermarkControls = document.getElementById('watermarkControls');
     const watermarkTypeSelect = document.getElementById('watermarkTypeSelect');
@@ -699,6 +767,86 @@
     filenameModeSelect.addEventListener('change', updateFilenamePreview);
     recordingSequenceInput.addEventListener('input', updateFilenamePreview);
     updateFilenamePreview();
+
+    function shortcutFromEvent(event) {
+      const modifiers = [];
+      if (event.ctrlKey) modifiers.push('Ctrl');
+      if (event.altKey) modifiers.push('Alt');
+      if (event.shiftKey) modifiers.push('Shift');
+      if (event.metaKey) modifiers.push('Meta');
+      let key = event.key;
+      if (/^F\d{1,2}$/i.test(key)) key = key.toUpperCase();
+      else if (key.length === 1) key = key.toUpperCase();
+      if (['Control', 'Alt', 'Shift', 'Meta'].includes(key)) return '';
+      return [...modifiers, key].join('+');
+    }
+
+    const hotkeyInputs = {
+      record: recordHotkeyInput,
+      pause: pauseHotkeyInput,
+      stop: stopHotkeyInput
+    };
+    recordHotkeyInput.value = localStorage.getItem('screenRecorderRecordHotkey') || 'F9';
+    pauseHotkeyInput.value = localStorage.getItem('screenRecorderPauseHotkey') || 'F9';
+    stopHotkeyInput.value = localStorage.getItem('screenRecorderStopHotkey') || 'F10';
+    Object.entries(hotkeyInputs).forEach(([name, input]) => {
+      input.addEventListener('keydown', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const shortcut = shortcutFromEvent(event);
+        if (!shortcut) return;
+        input.value = shortcut;
+        localStorage.setItem(`screenRecorder${name[0].toUpperCase() + name.slice(1)}Hotkey`, shortcut);
+        input.blur();
+      });
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.repeat || event.target.classList?.contains('hotkey-input')) return;
+      const shortcut = shortcutFromEvent(event);
+      if (!shortcut) return;
+      if (isRecording && shortcut === stopHotkeyInput.value) {
+        event.preventDefault();
+        stopRecording();
+      } else if (isRecording && shortcut === pauseHotkeyInput.value) {
+        event.preventDefault();
+        togglePause();
+      } else if (!isRecording && !isPreparing && playbackVideo.classList.contains('hidden') && shortcut === recordHotkeyInput.value) {
+        event.preventDefault();
+        startRecording();
+      }
+    });
+
+    function updateCursorHighlightSettings() {
+      const enabled = cursorHighlightToggle.checked;
+      cursorHighlightControls.classList.toggle('opacity-50', !enabled);
+      cursorHighlightControls.classList.toggle('pointer-events-none', !enabled);
+      const size = Number(cursorHighlightSize.value);
+      const softness = Number(cursorHighlightSoftness.value);
+      const opacity = Number(cursorHighlightOpacity.value) / 100;
+      cursorHighlightSizeValue.textContent = `${size}px`;
+      cursorHighlightSoftnessValue.textContent = `${softness}px`;
+      cursorHighlightOpacityValue.textContent = `${cursorHighlightOpacity.value}%`;
+      cursorHighlightOverlay.style.width = `${size}px`;
+      cursorHighlightOverlay.style.height = `${size}px`;
+      cursorHighlightOverlay.style.backgroundColor = hexToRgba(cursorHighlightColor.value, opacity);
+      cursorHighlightOverlay.style.boxShadow = `0 0 ${softness}px ${Math.round(softness / 3)}px ${hexToRgba(cursorHighlightColor.value, opacity * 0.7)}`;
+      if (!enabled) cursorHighlightOverlay.style.display = 'none';
+    }
+    [cursorHighlightToggle, cursorHighlightColor, cursorHighlightSize, cursorHighlightSoftness, cursorHighlightOpacity]
+      .forEach(control => {
+        control.addEventListener('input', updateCursorHighlightSettings);
+        control.addEventListener('change', updateCursorHighlightSettings);
+      });
+    document.addEventListener('pointermove', event => {
+      if (!cursorHighlightToggle.checked) return;
+      cursorHighlightOverlay.style.left = `${event.clientX}px`;
+      cursorHighlightOverlay.style.top = `${event.clientY}px`;
+      cursorHighlightOverlay.style.display = 'block';
+    });
+    document.addEventListener('pointerleave', () => { cursorHighlightOverlay.style.display = 'none'; });
+    window.addEventListener('blur', () => { cursorHighlightOverlay.style.display = 'none'; });
+    updateCursorHighlightSettings();
 
     function formatWatermarkDateTime(date) {
       const year = date.getFullYear();
@@ -1391,7 +1539,8 @@
         const displayMediaOptions = {
           video: {
             displaySurface: displaySurfaceMode.value,
-            frameRate: { ideal: 30, max: 60 }
+            frameRate: { ideal: 30, max: 60 },
+            cursor: 'always'
           },
           audio: sysAudioToggle.checked
         };
