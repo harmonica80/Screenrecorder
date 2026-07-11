@@ -131,6 +131,24 @@
       border-radius: 8px;
     }
 
+    #watermarkPreview {
+      position: absolute;
+      z-index: 40;
+      color: #fff;
+      font-weight: 600;
+      line-height: 1.3;
+      white-space: nowrap;
+      pointer-events: none;
+      text-shadow: 0 1px 4px rgba(0,0,0,.9);
+    }
+
+    #watermarkPreview img {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
     /* 隱藏的合成畫布 */
     #compositingCanvas {
       display: none;
@@ -193,6 +211,54 @@
               class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
           </div>
           <p class="text-xs text-slate-500 mt-2">檔名預覽：<span id="filenamePreview" class="font-medium text-slate-700">01</span></p>
+        </div>
+
+        <!-- 影片浮水印 -->
+        <div class="mb-5 p-3.5 border border-cyan-100 bg-cyan-50/40 rounded-xl space-y-3">
+          <label class="flex items-center justify-between gap-3 cursor-pointer">
+            <span>
+              <span class="block font-medium text-sm text-slate-800">影片浮水印</span>
+              <span class="block text-xs text-slate-500">預設顯示錄影日期與時間</span>
+            </span>
+            <input id="watermarkToggle" type="checkbox" class="accent-cyan-600" checked>
+          </label>
+          <div id="watermarkControls" class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+              <label class="text-xs text-slate-600">類型
+                <select id="watermarkTypeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="datetime" selected>錄影日期＋時間</option><option value="text">自訂文字</option><option value="image">PNG 圖片</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">大小
+                <select id="watermarkSizeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="small">小</option><option value="medium" selected>中</option><option value="large">大</option>
+                </select>
+              </label>
+            </div>
+            <input id="watermarkText" value="述文老師錄影" maxlength="80" disabled
+              class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 disabled:opacity-50" aria-label="浮水印文字">
+            <label id="watermarkImageLabel" class="hidden text-xs text-slate-600">PNG 圖片
+              <input id="watermarkImageInput" type="file" accept="image/png" class="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-cyan-100 file:text-cyan-700 cursor-pointer">
+            </label>
+            <label class="block text-xs text-slate-600">不透明度：<span id="watermarkOpacityValue">70%</span>
+              <input id="watermarkOpacity" type="range" min="0" max="100" value="70" class="mt-1 w-full accent-cyan-600">
+            </label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="text-xs text-slate-600">位置
+                <select id="watermarkPositionSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="top-left">左上</option><option value="top-center">上中</option><option value="top-right">右上</option>
+                  <option value="middle-left">左中</option><option value="center">正中</option><option value="middle-right">右中</option>
+                  <option value="bottom-left">左下</option><option value="bottom-center">下中</option><option value="bottom-right" selected>右下</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">水平邊距 %
+                <input id="watermarkMarginX" type="number" min="0" max="30" value="2" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+              </label>
+              <label class="text-xs text-slate-600">垂直邊距 %
+                <input id="watermarkMarginY" type="number" min="0" max="30" value="2" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+              </label>
+            </div>
+          </div>
         </div>
 
         <!-- 開關選項區塊 -->
@@ -418,6 +484,7 @@
             <canvas id="webcamEffectCanvas"></canvas>
             <div id="webcamNameplate">述文老師｜數位教學講師</div>
           </div>
+          <div id="watermarkPreview"></div>
         </div>
 
         <!-- 錄製完成後的回放播放器 -->
@@ -523,6 +590,18 @@
     const filenameModeSelect = document.getElementById('filenameModeSelect');
     const recordingSequenceInput = document.getElementById('recordingSequenceInput');
     const filenamePreview = document.getElementById('filenamePreview');
+    const watermarkToggle = document.getElementById('watermarkToggle');
+    const watermarkControls = document.getElementById('watermarkControls');
+    const watermarkTypeSelect = document.getElementById('watermarkTypeSelect');
+    const watermarkSizeSelect = document.getElementById('watermarkSizeSelect');
+    const watermarkText = document.getElementById('watermarkText');
+    const watermarkImageLabel = document.getElementById('watermarkImageLabel');
+    const watermarkImageInput = document.getElementById('watermarkImageInput');
+    const watermarkOpacity = document.getElementById('watermarkOpacity');
+    const watermarkOpacityValue = document.getElementById('watermarkOpacityValue');
+    const watermarkPositionSelect = document.getElementById('watermarkPositionSelect');
+    const watermarkMarginX = document.getElementById('watermarkMarginX');
+    const watermarkMarginY = document.getElementById('watermarkMarginY');
 
     const previewContainer = document.getElementById('previewContainer');
     const previewVideo = document.getElementById('previewVideo');
@@ -531,6 +610,7 @@
     const webcamEffectCanvas = document.getElementById('webcamEffectCanvas');
     const webcamEffectCtx = webcamEffectCanvas.getContext('2d');
     const webcamNameplate = document.getElementById('webcamNameplate');
+    const watermarkPreview = document.getElementById('watermarkPreview');
     const playbackVideo = document.getElementById('playbackVideo');
     const videoPlaceholder = document.getElementById('videoPlaceholder');
     const videoArea = document.getElementById('videoArea');
@@ -568,6 +648,9 @@
     let animationFrameId = null;
     let isPreparing = false;
     let countdownCancelled = false;
+    let recordingStartedAt = null;
+    let watermarkImageUrl = null;
+    const watermarkImage = new Image();
     let isCameraVisible = true;
     let selfieSegmentation = null;
     let segmentationMask = null;
@@ -616,6 +699,96 @@
     filenameModeSelect.addEventListener('change', updateFilenamePreview);
     recordingSequenceInput.addEventListener('input', updateFilenamePreview);
     updateFilenamePreview();
+
+    function formatWatermarkDateTime(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+
+    function getWatermarkText() {
+      return watermarkTypeSelect.value === 'datetime'
+        ? formatWatermarkDateTime(recordingStartedAt || new Date())
+        : watermarkText.value.trim();
+    }
+
+    function updateWatermarkPreview() {
+      const enabled = watermarkToggle.checked;
+      watermarkControls.classList.toggle('opacity-50', !enabled);
+      watermarkControls.classList.toggle('pointer-events-none', !enabled);
+      watermarkText.disabled = watermarkTypeSelect.value !== 'text';
+      watermarkImageLabel.classList.toggle('hidden', watermarkTypeSelect.value !== 'image');
+      watermarkOpacityValue.textContent = `${watermarkOpacity.value}%`;
+      watermarkPreview.hidden = !enabled;
+      watermarkPreview.style.opacity = Number(watermarkOpacity.value) / 100;
+
+      const sizeMap = {
+        small: { font: 12, image: 80 },
+        medium: { font: 16, image: 130 },
+        large: { font: 22, image: 200 }
+      };
+      const size = sizeMap[watermarkSizeSelect.value];
+      watermarkPreview.style.fontSize = `${size.font}px`;
+      watermarkPreview.style.width = watermarkTypeSelect.value === 'image' ? `${size.image}px` : 'auto';
+
+      if (watermarkTypeSelect.value === 'image') {
+        watermarkPreview.replaceChildren();
+        if (watermarkImageUrl) {
+          const image = document.createElement('img');
+          image.src = watermarkImageUrl;
+          image.alt = '浮水印';
+          watermarkPreview.appendChild(image);
+        }
+      } else {
+        watermarkPreview.textContent = getWatermarkText();
+      }
+
+      const marginX = Math.max(0, Math.min(30, Number(watermarkMarginX.value) || 0));
+      const marginY = Math.max(0, Math.min(30, Number(watermarkMarginY.value) || 0));
+      watermarkPreview.style.left = 'auto';
+      watermarkPreview.style.right = 'auto';
+      watermarkPreview.style.top = 'auto';
+      watermarkPreview.style.bottom = 'auto';
+      watermarkPreview.style.transform = 'none';
+      const position = watermarkPositionSelect.value;
+      if (position.includes('left')) watermarkPreview.style.left = `${marginX}%`;
+      else if (position.includes('right')) watermarkPreview.style.right = `${marginX}%`;
+      else { watermarkPreview.style.left = '50%'; watermarkPreview.style.transform = 'translateX(-50%)'; }
+      if (position.startsWith('top')) watermarkPreview.style.top = `${marginY}%`;
+      else if (position.startsWith('bottom')) watermarkPreview.style.bottom = `${marginY}%`;
+      else {
+        watermarkPreview.style.top = '50%';
+        watermarkPreview.style.transform += ' translateY(-50%)';
+      }
+    }
+
+    [watermarkToggle, watermarkTypeSelect, watermarkSizeSelect, watermarkText, watermarkOpacity,
+      watermarkPositionSelect, watermarkMarginX, watermarkMarginY].forEach(control => {
+      control.addEventListener('input', updateWatermarkPreview);
+      control.addEventListener('change', updateWatermarkPreview);
+    });
+    watermarkImageInput.addEventListener('change', () => {
+      const file = watermarkImageInput.files?.[0];
+      if (!file) return;
+      if (file.type !== 'image/png') {
+        alert('浮水印圖片僅支援 PNG 格式。');
+        watermarkImageInput.value = '';
+        return;
+      }
+      if (watermarkImageUrl) URL.revokeObjectURL(watermarkImageUrl);
+      watermarkImageUrl = URL.createObjectURL(file);
+      watermarkImage.onload = updateWatermarkPreview;
+      watermarkImage.src = watermarkImageUrl;
+      updateWatermarkPreview();
+    });
+    updateWatermarkPreview();
+    setInterval(() => {
+      if (watermarkTypeSelect.value === 'datetime' && !recordingStartedAt) updateWatermarkPreview();
+    }, 1000);
 
     function syncDeviceSelectStates() {
       micDeviceSelect.disabled = !micToggle.checked;
@@ -771,6 +944,59 @@
       }
 
       context.drawImage(source, cropX, cropY, cropWidth, cropHeight, x, y, width, height);
+    }
+
+    function getWatermarkCanvasPosition(itemWidth, itemHeight) {
+      const marginX = canvas.width * Math.max(0, Math.min(30, Number(watermarkMarginX.value) || 0)) / 100;
+      const marginY = canvas.height * Math.max(0, Math.min(30, Number(watermarkMarginY.value) || 0)) / 100;
+      const position = watermarkPositionSelect.value;
+      let x;
+      let y;
+
+      if (position.includes('left')) x = marginX;
+      else if (position.includes('right')) x = canvas.width - itemWidth - marginX;
+      else x = (canvas.width - itemWidth) / 2;
+
+      if (position.startsWith('top')) y = marginY;
+      else if (position.startsWith('bottom')) y = canvas.height - itemHeight - marginY;
+      else y = (canvas.height - itemHeight) / 2;
+      return { x, y };
+    }
+
+    function drawWatermark() {
+      if (!watermarkToggle.checked) return;
+      ctx.save();
+      ctx.globalAlpha = Number(watermarkOpacity.value) / 100;
+
+      if (watermarkTypeSelect.value === 'image') {
+        if (!watermarkImage.complete || !watermarkImage.naturalWidth) {
+          ctx.restore();
+          return;
+        }
+        const widthRatio = { small: 0.08, medium: 0.14, large: 0.22 }[watermarkSizeSelect.value];
+        const imageWidth = canvas.width * widthRatio;
+        const imageHeight = imageWidth * watermarkImage.naturalHeight / watermarkImage.naturalWidth;
+        const { x, y } = getWatermarkCanvasPosition(imageWidth, imageHeight);
+        ctx.drawImage(watermarkImage, x, y, imageWidth, imageHeight);
+      } else {
+        const fontRatio = { small: 0.018, medium: 0.026, large: 0.04 }[watermarkSizeSelect.value];
+        const fontSize = Math.max(14, Math.round(canvas.height * fontRatio));
+        const text = getWatermarkText();
+        if (!text) {
+          ctx.restore();
+          return;
+        }
+        ctx.font = `600 ${fontSize}px sans-serif`;
+        const textWidth = ctx.measureText(text).width;
+        const textHeight = fontSize * 1.25;
+        const { x, y } = getWatermarkCanvasPosition(textWidth, textHeight);
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'top';
+        ctx.shadowColor = 'rgba(0,0,0,.85)';
+        ctx.shadowBlur = Math.max(2, fontSize * 0.15);
+        ctx.fillText(text, x, y);
+      }
+      ctx.restore();
     }
 
     async function refreshMediaDevices() {
@@ -1147,6 +1373,7 @@
             ctx.restore();
           }
         }
+        drawWatermark();
       }
 
       animationFrameId = requestAnimationFrame(drawCanvasLoop);
@@ -1268,6 +1495,8 @@
         }
 
         isPreparing = false;
+        recordingStartedAt = new Date();
+        updateWatermarkPreview();
         mediaRecorder.start(1000);
         isPaused = false;
 
@@ -1377,6 +1606,8 @@
     pauseBtn.addEventListener('click', togglePause);
     stopBtn.addEventListener('click', stopRecording);
     newRecordBtn.addEventListener('click', () => {
+      recordingStartedAt = null;
+      updateWatermarkPreview();
       playbackVideo.src = "";
       if (downloadLink.href) {
         URL.revokeObjectURL(downloadLink.href);
