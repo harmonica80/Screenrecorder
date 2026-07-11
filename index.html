@@ -2,20 +2,11 @@
 <html lang="zh-TW">
 
 <head>
-  <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-2S6CT670L8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-2S6CT670L8');
-</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>純前端線上螢幕錄影工具 | Local Screen Recorder Pro</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/lucide.min.js"></script>
   <style>
     @keyframes pulse-ring {
       0% {
@@ -100,8 +91,7 @@
       <div class="bg-blue-600 text-white p-2 rounded-lg shadow-md shadow-blue-600/20">
         <i data-lucide="monitor-play" class="w-6 h-6"></i>
       </div>
-      <h1 class="text-xl font-bold tracking-tight">線上螢幕錄影工具 <span
-          class="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-md ml-2">Pro</span></h1>
+      <h1 class="text-xl font-bold tracking-tight">線上螢幕錄影工具</h1>
     </div>
     <div class="hidden md:flex items-center text-sm text-slate-500 gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
       <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i>
@@ -166,6 +156,11 @@
               <div>
                 <p class="font-medium text-sm text-slate-800">錄製麥克風</p>
                 <p class="text-xs text-slate-500">加入您的語音旁白解說</p>
+                <select id="micDeviceSelect" aria-label="選擇麥克風"
+                  class="mt-2 w-full max-w-64 bg-white border border-slate-200 text-slate-700 py-1.5 px-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onclick="event.stopPropagation()">
+                  <option value="">系統預設麥克風</option>
+                </select>
               </div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer" onclick="event.stopPropagation()">
@@ -186,12 +181,36 @@
               <div>
                 <p class="font-medium text-sm text-slate-800">開啟網路攝影機</p>
                 <p class="text-xs text-slate-500">子母畫面，並可拖曳調整位置</p>
+                <select id="cameraDeviceSelect" aria-label="選擇網路攝影機"
+                  class="mt-2 w-full max-w-64 bg-white border border-slate-200 text-slate-700 py-1.5 px-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onclick="event.stopPropagation()">
+                  <option value="">系統預設攝影機</option>
+                </select>
               </div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer" onclick="event.stopPropagation()">
               <input type="checkbox" id="cameraToggle" class="sr-only peer">
               <div
                 class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+              </div>
+            </label>
+          </div>
+
+          <!-- 錄影前倒數 -->
+          <div
+            class="flex items-center justify-between p-3.5 border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl cursor-pointer"
+            onclick="document.getElementById('countdownToggle').click()">
+            <div class="flex items-center gap-3">
+              <div class="p-2 bg-blue-100 text-blue-600 rounded-lg"><i data-lucide="timer" class="w-5 h-5"></i></div>
+              <div>
+                <p class="font-medium text-sm text-slate-800">錄影前 3 秒倒數</p>
+                <p class="text-xs text-slate-500">關閉後，選完分享來源就直接錄影</p>
+              </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer" onclick="event.stopPropagation()">
+              <input type="checkbox" id="countdownToggle" class="sr-only peer" checked>
+              <div
+                class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500">
               </div>
             </label>
           </div>
@@ -267,6 +286,17 @@
         <!-- 錄製完成後的回放播放器 -->
         <video id="playbackVideo" class="absolute inset-0 w-full h-full object-contain hidden bg-black" controls
           playsinline></video>
+
+        <!-- 錄影前倒數覆蓋層 -->
+        <div id="countdownOverlay"
+          class="absolute inset-0 hidden z-[60] bg-slate-950/75 backdrop-blur-sm flex-col items-center justify-center text-white">
+          <p class="text-sm md:text-base tracking-widest text-slate-300 mb-2">錄影即將開始</p>
+          <div id="countdownNumber" class="text-8xl md:text-9xl font-bold tabular-nums drop-shadow-2xl">3</div>
+          <button id="cancelCountdownBtn"
+            class="mt-6 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm transition-colors">
+            取消錄影
+          </button>
+        </div>
       </div>
 
       <!-- 下載結果區 -->
@@ -303,9 +333,10 @@
     <div
       class="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-12 py-8 flex flex-col md:flex-row justify-between items-center gap-4">
       <div class="text-sm text-slate-500 flex flex-wrap items-center gap-2 justify-center md:justify-start">
-        &copy; <span id="currentYear"></span> 螢幕錄影工具 Pro
-        <span class="text-slate-300 hidden md:inline">|</span>
-        <span>設計與開發：<a href="https://jamespolik.pixnet.net/blog/posts/875565960578027685" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700 hover:underline font-medium transition-colors">小黃老師嘿技術</a></span>
+        &copy; <span id="currentYear"></span>
+        <span>參考<a href="https://jamespolik.pixnet.net/blog/posts/875565960578027685" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700 hover:underline font-medium transition-colors">小黃老師嘿技術 2026 螢幕錄影工具 Pro</a></span>
+        <span class="text-slate-300">|</span>
+        <span class="font-medium text-slate-700">述文老師改版</span>
       </div>
 
       <!-- 免責聲明 -->
@@ -333,6 +364,9 @@
     const sysAudioToggle = document.getElementById('sysAudioToggle');
     const micToggle = document.getElementById('micToggle');
     const cameraToggle = document.getElementById('cameraToggle');
+    const micDeviceSelect = document.getElementById('micDeviceSelect');
+    const cameraDeviceSelect = document.getElementById('cameraDeviceSelect');
+    const countdownToggle = document.getElementById('countdownToggle');
     const displaySurfaceMode = document.getElementById('displaySurfaceMode');
 
     const previewContainer = document.getElementById('previewContainer');
@@ -342,6 +376,9 @@
     const playbackVideo = document.getElementById('playbackVideo');
     const videoPlaceholder = document.getElementById('videoPlaceholder');
     const videoArea = document.getElementById('videoArea');
+    const countdownOverlay = document.getElementById('countdownOverlay');
+    const countdownNumber = document.getElementById('countdownNumber');
+    const cancelCountdownBtn = document.getElementById('cancelCountdownBtn');
 
     const downloadSection = document.getElementById('downloadSection');
     const downloadLink = document.getElementById('downloadLink');
@@ -371,6 +408,57 @@
     let isPaused = false;
     let isRecording = false;
     let animationFrameId = null;
+    let isPreparing = false;
+    let countdownCancelled = false;
+
+    countdownToggle.checked = localStorage.getItem('screenRecorderCountdown') !== 'false';
+    countdownToggle.addEventListener('change', () => {
+      localStorage.setItem('screenRecorderCountdown', countdownToggle.checked);
+    });
+
+    function syncDeviceSelectStates() {
+      micDeviceSelect.disabled = !micToggle.checked;
+      cameraDeviceSelect.disabled = !cameraToggle.checked;
+    }
+
+    micToggle.addEventListener('change', syncDeviceSelectStates);
+    cameraToggle.addEventListener('change', syncDeviceSelectStates);
+    syncDeviceSelectStates();
+
+    async function refreshMediaDevices() {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        populateDeviceSelect(micDeviceSelect, devices.filter(device => device.kind === 'audioinput'), '麥克風');
+        populateDeviceSelect(cameraDeviceSelect, devices.filter(device => device.kind === 'videoinput'), '攝影機');
+      } catch (error) {
+        console.warn('無法取得媒體裝置清單：', error);
+      }
+    }
+
+    function populateDeviceSelect(select, devices, fallbackName) {
+      const previousValue = select.value || localStorage.getItem(`${select.id}Value`) || '';
+      select.innerHTML = `<option value="">系統預設${fallbackName}</option>`;
+
+      devices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.textContent = device.label || `${fallbackName} ${index + 1}`;
+        select.appendChild(option);
+      });
+
+      if ([...select.options].some(option => option.value === previousValue)) {
+        select.value = previousValue;
+      }
+    }
+
+    [micDeviceSelect, cameraDeviceSelect].forEach(select => {
+      select.addEventListener('change', () => localStorage.setItem(`${select.id}Value`, select.value));
+    });
+
+    refreshMediaDevices();
+    navigator.mediaDevices?.addEventListener?.('devicechange', refreshMediaDevices);
 
     // ------------------------------------------------------------
     // 攝影機拖曳邏輯 (Draggable PiP)
@@ -455,6 +543,8 @@
     function setUIState(state) {
       switch (state) {
         case 'ready':
+          countdownOverlay.classList.add('hidden');
+          countdownOverlay.classList.remove('flex');
           startBtn.classList.remove('hidden');
           recordingControls.classList.add('hidden');
           downloadSection.classList.remove('flex');
@@ -465,6 +555,10 @@
           timerDisplay.textContent = '00:00';
           videoArea.classList.remove('ring-red-500/50', 'border-red-500');
           videoArea.classList.add('border-slate-800');
+          if (!screenStream) {
+            previewContainer.classList.add('hidden');
+            videoPlaceholder.classList.remove('hidden');
+          }
           break;
         case 'recording':
           startBtn.classList.add('hidden');
@@ -482,6 +576,15 @@
           previewContainer.classList.remove('hidden');
           videoArea.classList.remove('border-slate-800');
           videoArea.classList.add('border-red-500', 'ring-red-500/20');
+          break;
+        case 'preparing':
+          startBtn.classList.add('hidden');
+          recordingControls.classList.add('hidden');
+          statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 font-medium text-sm mb-3 transition-colors';
+          statusDot.className = 'w-2.5 h-2.5 rounded-full bg-blue-500';
+          statusText.textContent = '準備錄影...';
+          videoPlaceholder.classList.add('hidden');
+          previewContainer.classList.remove('hidden');
           break;
         case 'paused':
           statusBadge.className = 'inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 text-amber-700 font-medium text-sm mb-3 transition-colors';
@@ -505,6 +608,26 @@
           videoArea.classList.add('border-emerald-400');
           break;
       }
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function runCountdown() {
+      countdownCancelled = false;
+      countdownOverlay.classList.remove('hidden');
+      countdownOverlay.classList.add('flex');
+
+      for (let count = 3; count >= 1; count--) {
+        if (countdownCancelled) return false;
+        countdownNumber.textContent = count;
+        await wait(1000);
+      }
+
+      countdownOverlay.classList.add('hidden');
+      countdownOverlay.classList.remove('flex');
+      return !countdownCancelled;
     }
 
     // ------------------------------------------------------------
@@ -565,7 +688,9 @@
     async function startRecording() {
       try {
         recordedChunks = [];
-        isRecording = true; // 提前設定狀態讓畫布可以跑
+        isPreparing = true;
+        isRecording = true; // 讓畫布在倒數期間先顯示即時預覽
+        setUIState('preparing');
 
         // 1. 獲取螢幕畫面 (依據下拉選單偏好設定)
         const displayMediaOptions = {
@@ -578,12 +703,22 @@
         screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
         previewVideo.srcObject = screenStream;
 
+        screenStream.getVideoTracks()[0].onended = () => {
+          if (isRecording || isPreparing) cancelPendingOrActiveRecording();
+        };
+
         // 2. 獲取攝影機 (如果開啟)
         if (cameraToggle.checked) {
           try {
+            const selectedCameraId = cameraDeviceSelect.value;
             cameraStream = await navigator.mediaDevices.getUserMedia({
-              video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                ...(selectedCameraId && { deviceId: { exact: selectedCameraId } })
+              }
             });
+            await refreshMediaDevices();
             webcamVideo.srcObject = cameraStream;
             webcamContainer.style.display = 'block';
             // 確保攝影機視窗重製為右下角
@@ -602,7 +737,11 @@
         // 3. 獲取麥克風音訊 (如果開啟)
         if (micToggle.checked) {
           try {
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const selectedMicId = micDeviceSelect.value;
+            micStream = await navigator.mediaDevices.getUserMedia({
+              audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true
+            });
+            await refreshMediaDevices();
           } catch (e) {
             alert("無法存取麥克風，將略過麥克風錄音。");
             micToggle.checked = false;
@@ -652,11 +791,6 @@
         }
         mixedStream = new MediaStream(tracksToRecord);
 
-        // 當使用者按瀏覽器原生的「停止共用」按鈕時觸發
-        screenStream.getVideoTracks()[0].onended = () => {
-          if (isRecording) stopRecording();
-        };
-
         // 6. 設定 MediaRecorder 並優先尋求支援 MP4
         const mimeTypes = [
           'video/mp4',
@@ -679,6 +813,12 @@
 
         mediaRecorder.onstop = exportVideo;
 
+        if (countdownToggle.checked) {
+          const shouldStart = await runCountdown();
+          if (!shouldStart) return;
+        }
+
+        isPreparing = false;
         mediaRecorder.start(1000);
         isPaused = false;
 
@@ -691,6 +831,7 @@
       } catch (err) {
         console.error("啟動錄影失敗: ", err);
         isRecording = false;
+        isPreparing = false;
 
         // 避免將瀏覽器的原生權限錯誤訊息直接用 alert() 強制彈出干擾使用者
         const errMsg = err.message || '';
@@ -712,6 +853,28 @@
       if (micStream) micStream.getTracks().forEach(t => t.stop());
       if (mixedStream) mixedStream.getTracks().forEach(t => t.stop());
       if (audioContext && audioContext.state !== 'closed') audioContext.close();
+      screenStream = cameraStream = micStream = mixedStream = null;
+      audioContext = null;
+    }
+
+    function cancelPendingOrActiveRecording() {
+      if (isPreparing) {
+        countdownCancelled = true;
+        isPreparing = false;
+        isRecording = false;
+        cancelAnimationFrame(animationFrameId);
+        countdownOverlay.classList.add('hidden');
+        countdownOverlay.classList.remove('flex');
+        stopMediaTracks();
+        previewVideo.srcObject = null;
+        webcamVideo.srcObject = null;
+        webcamContainer.style.display = 'none';
+        setUIState('ready');
+        videoPlaceholder.classList.remove('hidden');
+        previewContainer.classList.add('hidden');
+      } else if (isRecording) {
+        stopRecording();
+      }
     }
 
     function togglePause() {
@@ -757,6 +920,7 @@
 
     // 事件綁定
     startBtn.addEventListener('click', startRecording);
+    cancelCountdownBtn.addEventListener('click', cancelPendingOrActiveRecording);
     pauseBtn.addEventListener('click', togglePause);
     stopBtn.addEventListener('click', stopRecording);
     newRecordBtn.addEventListener('click', () => {
