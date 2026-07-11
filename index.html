@@ -217,6 +217,20 @@
           <p class="text-xs text-slate-500 mt-2">檔名預覽：<span id="filenamePreview" class="font-medium text-slate-700">01</span></p>
         </div>
 
+        <!-- 錄影編碼與品質 -->
+        <div class="mb-5 p-3.5 border border-indigo-100 bg-indigo-50/40 rounded-xl">
+          <label class="block text-sm font-medium text-slate-800">錄影編碼與品質
+            <select id="encodingPresetSelect" class="mt-2 w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm text-slate-700">
+              <option value="auto" selected>自動選擇（依瀏覽器選最適合格式）</option>
+              <option value="h264">相容性優先：H.264 + AAC／MP4（5～6 Mbps）</option>
+              <option value="vp9">平衡推薦：VP9 + Opus／WebM（3～4 Mbps）</option>
+              <option value="av1">小檔案：AV1 + Opus／WebM（2～3 Mbps）</option>
+              <option value="high">高畫質：VP9 或 H.264（7～10 Mbps）</option>
+            </select>
+          </label>
+          <p id="encodingStatus" class="text-xs text-slate-500 mt-2">實際編碼格式會在開始錄影時依瀏覽器能力確認。</p>
+        </div>
+
         <!-- 錄影快速鍵 -->
         <div class="mb-5 p-3.5 border border-violet-100 bg-violet-50/40 rounded-xl space-y-3">
           <div>
@@ -620,6 +634,8 @@
     const filenameModeSelect = document.getElementById('filenameModeSelect');
     const recordingSequenceInput = document.getElementById('recordingSequenceInput');
     const filenamePreview = document.getElementById('filenamePreview');
+    const encodingPresetSelect = document.getElementById('encodingPresetSelect');
+    const encodingStatus = document.getElementById('encodingStatus');
     const recordHotkeyInput = document.getElementById('recordHotkeyInput');
     const pauseHotkeyInput = document.getElementById('pauseHotkeyInput');
     const stopHotkeyInput = document.getElementById('stopHotkeyInput');
@@ -754,6 +770,45 @@
     filenameModeSelect.addEventListener('change', updateFilenamePreview);
     recordingSequenceInput.addEventListener('input', updateFilenamePreview);
     updateFilenamePreview();
+
+    encodingPresetSelect.value = localStorage.getItem('screenRecorderEncodingPreset') || 'auto';
+    encodingPresetSelect.addEventListener('change', () => {
+      localStorage.setItem('screenRecorderEncodingPreset', encodingPresetSelect.value);
+      encodingStatus.textContent = '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
+    });
+
+    function selectRecordingEncoding() {
+      const presets = {
+        auto: {
+          label: '自動選擇',
+          bitRate: 5000000,
+          types: ['video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm']
+        },
+        h264: {
+          label: 'H.264 + AAC／MP4',
+          bitRate: 6000000,
+          types: ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=h264,opus']
+        },
+        vp9: {
+          label: 'VP9 + Opus／WebM',
+          bitRate: 3500000,
+          types: ['video/webm;codecs=vp9,opus', 'video/webm']
+        },
+        av1: {
+          label: 'AV1 + Opus／WebM',
+          bitRate: 2500000,
+          types: ['video/webm;codecs=av01,opus', 'video/webm;codecs=vp9,opus', 'video/webm']
+        },
+        high: {
+          label: '高畫質',
+          bitRate: 8000000,
+          types: ['video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm']
+        }
+      };
+      const preset = presets[encodingPresetSelect.value];
+      const mimeType = preset.types.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+      return { ...preset, mimeType, usedFallback: !preset.types.slice(0, 1).includes(mimeType) };
+    }
 
     function shortcutFromEvent(event) {
       const modifiers = [];
@@ -1601,20 +1656,15 @@
         }
         mixedStream = new MediaStream(tracksToRecord);
 
-        // 6. 設定 MediaRecorder 並優先尋求支援 MP4
-        const mimeTypes = [
-          'video/mp4',
-          'video/webm;codecs=h264,aac',
-          'video/webm;codecs=h264,opus',
-          'video/webm;codecs=vp9,opus',
-          'video/webm'
-        ];
-        const selectedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
-        recordingMimeType = selectedMimeType;
+        // 6. 依使用者選擇與瀏覽器能力設定編碼
+        const encoding = selectRecordingEncoding();
+        recordingMimeType = encoding.mimeType;
+        encodingStatus.textContent = `實際使用：${encoding.label} · ${encoding.mimeType} · ${(encoding.bitRate / 1000000).toFixed(1)} Mbps${encoding.usedFallback ? '（瀏覽器已自動改用可用格式）' : ''}`;
 
         mediaRecorder = new MediaRecorder(mixedStream, {
-          mimeType: selectedMimeType,
-          videoBitsPerSecond: 5000000 // 5Mbps 高畫質
+          mimeType: encoding.mimeType,
+          videoBitsPerSecond: encoding.bitRate,
+          audioBitsPerSecond: 128000
         });
 
         mediaRecorder.ondataavailable = function (e) {
