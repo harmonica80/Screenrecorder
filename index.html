@@ -701,6 +701,29 @@
       context.closePath();
     }
 
+    function drawImageCover(context, source, x, y, width, height) {
+      const sourceWidth = source.videoWidth || source.width;
+      const sourceHeight = source.videoHeight || source.height;
+      if (!sourceWidth || !sourceHeight) return;
+
+      const sourceRatio = sourceWidth / sourceHeight;
+      const targetRatio = width / height;
+      let cropX = 0;
+      let cropY = 0;
+      let cropWidth = sourceWidth;
+      let cropHeight = sourceHeight;
+
+      if (sourceRatio > targetRatio) {
+        cropWidth = sourceHeight * targetRatio;
+        cropX = (sourceWidth - cropWidth) / 2;
+      } else if (sourceRatio < targetRatio) {
+        cropHeight = sourceWidth / targetRatio;
+        cropY = (sourceHeight - cropHeight) / 2;
+      }
+
+      context.drawImage(source, cropX, cropY, cropWidth, cropHeight, x, y, width, height);
+    }
+
     async function refreshMediaDevices() {
       if (!navigator.mediaDevices?.enumerateDevices) return;
 
@@ -1014,9 +1037,9 @@
           ctx.clip();
 
           if (backgroundEffectSelect.value !== 'none' && webcamEffectCanvas.width > 0) {
-            ctx.drawImage(webcamEffectCanvas, drawX, drawY, drawW, drawH);
+            drawImageCover(ctx, webcamEffectCanvas, drawX, drawY, drawW, drawH);
           } else {
-            ctx.drawImage(webcamVideo, drawX, drawY, drawW, drawH);
+            drawImageCover(ctx, webcamVideo, drawX, drawY, drawW, drawH);
           }
 
           ctx.restore();
