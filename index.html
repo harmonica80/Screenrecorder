@@ -104,6 +104,33 @@
       pointer-events: none;
     }
 
+    #webcamContainer.shape-circle #webcamNameplate {
+      left: 15%;
+      right: 15%;
+      bottom: 8%;
+      border-radius: 999px;
+      padding: 5px 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #webcamNameplate.nameplate-pill {
+      left: 8%; right: 8%; bottom: 7%; border-radius: 999px;
+    }
+    #webcamNameplate.nameplate-minimal {
+      left: 8%; right: auto; bottom: 7%; width: auto; border-radius: 6px;
+      text-align: left; text-shadow: 0 1px 3px rgba(0,0,0,.85);
+    }
+    #webcamNameplate.nameplate-accent {
+      left: 6%; right: 6%; bottom: 6%; border-left: 5px solid #38bdf8;
+      border-radius: 6px; text-align: left;
+    }
+    #webcamNameplate.nameplate-outline {
+      left: 8%; right: 8%; bottom: 7%; border: 2px solid rgba(255,255,255,.9);
+      border-radius: 8px;
+    }
+
     /* 隱藏的合成畫布 */
     #compositingCanvas {
       display: none;
@@ -291,6 +318,24 @@
             </label>
             <input id="nameplateText" value="述文老師｜數位教學講師" maxlength="50"
               class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 disabled:opacity-50" aria-label="姓名牌文字">
+            <div class="grid grid-cols-2 gap-2">
+              <label class="text-xs text-slate-600">姓名牌樣式
+                <select id="nameplateStyleSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="banner" selected>橫幅</option><option value="pill">膠囊</option><option value="minimal">簡約</option><option value="accent">重點色</option><option value="outline">外框</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">姓名牌尺寸
+                <select id="nameplateSizeSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
+                  <option value="small">小</option><option value="medium" selected>中</option><option value="large">大</option><option value="xlarge">特大</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-600">背景顏色
+                <input id="nameplateColor" type="color" value="#0f172a" class="mt-1 w-full h-9 bg-white border border-slate-200 rounded-lg p-1 cursor-pointer">
+              </label>
+            </div>
+            <label class="block text-xs text-slate-600">背景透明度：<span id="nameplateOpacityValue">86%</span>
+              <input id="nameplateOpacity" type="range" min="0" max="100" value="86" class="mt-1 w-full accent-emerald-600">
+            </label>
           </div>
         </div>
 
@@ -452,6 +497,11 @@
     const backgroundEffectSelect = document.getElementById('backgroundEffectSelect');
     const nameplateToggle = document.getElementById('nameplateToggle');
     const nameplateText = document.getElementById('nameplateText');
+    const nameplateStyleSelect = document.getElementById('nameplateStyleSelect');
+    const nameplateSizeSelect = document.getElementById('nameplateSizeSelect');
+    const nameplateColor = document.getElementById('nameplateColor');
+    const nameplateOpacity = document.getElementById('nameplateOpacity');
+    const nameplateOpacityValue = document.getElementById('nameplateOpacityValue');
     const countdownToggle = document.getElementById('countdownToggle');
     const countdownSecondsSelect = document.getElementById('countdownSecondsSelect');
     const displaySurfaceMode = document.getElementById('displaySurfaceMode');
@@ -551,9 +601,26 @@
       nameplateText.disabled = !nameplateToggle.checked;
       webcamNameplate.hidden = !nameplateToggle.checked || !nameplateText.value.trim();
       webcamNameplate.textContent = nameplateText.value.trim();
+      webcamNameplate.className = nameplateStyleSelect.value === 'banner' ? '' : `nameplate-${nameplateStyleSelect.value}`;
+      const sizeMap = {
+        small: { font: 10, vertical: 4, horizontal: 6 },
+        medium: { font: 12, vertical: 6, horizontal: 8 },
+        large: { font: 15, vertical: 8, horizontal: 10 },
+        xlarge: { font: 18, vertical: 10, horizontal: 12 }
+      };
+      const nameplateSize = sizeMap[nameplateSizeSelect.value];
+      webcamNameplate.style.fontSize = `${nameplateSize.font}px`;
+      webcamNameplate.style.padding = `${nameplateSize.vertical}px ${nameplateSize.horizontal}px`;
+      const alpha = Number(nameplateOpacity.value) / 100;
+      webcamNameplate.style.backgroundColor = hexToRgba(nameplateColor.value, alpha);
+      nameplateOpacityValue.textContent = `${nameplateOpacity.value}%`;
     }
     nameplateToggle.addEventListener('change', syncNameplatePreview);
     nameplateText.addEventListener('input', syncNameplatePreview);
+    nameplateStyleSelect.addEventListener('change', syncNameplatePreview);
+    nameplateSizeSelect.addEventListener('change', syncNameplatePreview);
+    nameplateColor.addEventListener('input', syncNameplatePreview);
+    nameplateOpacity.addEventListener('input', syncNameplatePreview);
     cameraVisibilityBtn.addEventListener('click', () => {
       isCameraVisible = !isCameraVisible;
       webcamContainer.style.visibility = isCameraVisible ? 'visible' : 'hidden';
@@ -569,6 +636,14 @@
     backgroundEffectSelect.addEventListener('change', applyBackgroundEffect);
     applyCameraAppearance();
     syncNameplatePreview();
+
+    function hexToRgba(hex, alpha) {
+      const value = hex.replace('#', '');
+      const r = parseInt(value.slice(0, 2), 16);
+      const g = parseInt(value.slice(2, 4), 16);
+      const b = parseInt(value.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
 
     function initSelfieSegmentation() {
       if (selfieSegmentation || typeof SelfieSegmentation === 'undefined') return;
@@ -657,6 +732,66 @@
     [micDeviceSelect, cameraDeviceSelect].forEach(select => {
       select.addEventListener('change', () => localStorage.setItem(`${select.id}Value`, select.value));
     });
+    cameraToggle.addEventListener('change', async () => {
+      if (cameraToggle.checked) {
+        await startCameraPreview(true);
+      } else {
+        stopCameraPreview();
+      }
+    });
+    cameraDeviceSelect.addEventListener('change', async () => {
+      if (cameraToggle.checked) await startCameraPreview(false);
+    });
+
+    async function startCameraPreview(resetPosition = false) {
+      try {
+        if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+        const selectedCameraId = cameraDeviceSelect.value;
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            ...(selectedCameraId && { deviceId: { exact: selectedCameraId } })
+          }
+        });
+        webcamVideo.srcObject = cameraStream;
+        await webcamVideo.play().catch(() => {});
+        previewContainer.classList.remove('hidden');
+        videoPlaceholder.classList.add('hidden');
+        webcamContainer.style.display = 'block';
+        webcamContainer.style.visibility = 'visible';
+        isCameraVisible = true;
+        cameraVisibilityBtn.textContent = '隱藏畫面';
+        if (resetPosition) {
+          webcamContainer.style.bottom = '20px';
+          webcamContainer.style.right = '20px';
+          webcamContainer.style.left = 'auto';
+          webcamContainer.style.top = 'auto';
+        }
+        applyCameraAppearance();
+        applyBackgroundEffect();
+        await refreshMediaDevices();
+        return true;
+      } catch (error) {
+        console.error('無法開啟攝影機預覽：', error);
+        cameraToggle.checked = false;
+        syncDeviceSelectStates();
+        stopCameraPreview();
+        alert('無法存取攝影機，請確認瀏覽器權限與裝置是否正在使用。');
+        return false;
+      }
+    }
+
+    function stopCameraPreview() {
+      if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream = null;
+      webcamVideo.srcObject = null;
+      webcamContainer.style.display = 'none';
+      if (!screenStream) {
+        previewContainer.classList.add('hidden');
+        videoPlaceholder.classList.remove('hidden');
+      }
+    }
 
     refreshMediaDevices();
     navigator.mediaDevices?.addEventListener?.('devicechange', refreshMediaDevices);
@@ -896,17 +1031,47 @@
 
           if (nameplateToggle.checked && nameplateText.value.trim()) {
             ctx.save();
-            const fontSize = Math.max(14, Math.round(drawW / 13));
+            const sizeScale = { small: 0.8, medium: 1, large: 1.25, xlarge: 1.5 }[nameplateSizeSelect.value];
+            const fontSize = Math.max(12, Math.round(drawW / 13 * sizeScale));
             ctx.font = `600 ${fontSize}px sans-serif`;
             const text = nameplateText.value.trim();
             const padding = fontSize * 0.7;
-            const labelWidth = ctx.measureText(text).width + padding * 2;
+            const safeX = drawX + (isCircle ? drawW * 0.15 : 0);
+            const safeWidth = drawW * (isCircle ? 0.7 : 1);
+            const measuredWidth = ctx.measureText(text).width + padding * 2;
             const labelHeight = fontSize * 2.1;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
-            ctx.fillRect(drawX, drawY + drawH - labelHeight, Math.min(labelWidth, drawW), labelHeight);
+            const style = nameplateStyleSelect.value;
+            let labelWidth = style === 'banner' ? safeWidth : Math.min(measuredWidth, safeWidth);
+            if (style === 'accent') labelWidth = safeWidth * 0.92;
+            const labelX = safeX + (safeWidth - labelWidth) / 2;
+            const labelY = drawY + drawH - labelHeight - (isCircle ? drawH * 0.08 : 0);
+            const alpha = Number(nameplateOpacity.value) / 100;
+            ctx.fillStyle = hexToRgba(nameplateColor.value, alpha);
+
+            if (style === 'pill') {
+              roundedRectPath(ctx, labelX, labelY, labelWidth, labelHeight, labelHeight / 2);
+              ctx.fill();
+            } else if (style === 'minimal') {
+              roundedRectPath(ctx, labelX, labelY, labelWidth, labelHeight, 6);
+              ctx.fill();
+            } else if (style === 'accent') {
+              roundedRectPath(ctx, labelX, labelY, labelWidth, labelHeight, 6);
+              ctx.fill();
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillRect(labelX, labelY, Math.max(4, fontSize * 0.28), labelHeight);
+            } else if (style === 'outline') {
+              roundedRectPath(ctx, labelX, labelY, labelWidth, labelHeight, 8);
+              ctx.fill();
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = 'rgba(255,255,255,.9)';
+              ctx.stroke();
+            } else {
+              ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
+            }
             ctx.fillStyle = '#fff';
             ctx.textBaseline = 'middle';
-            ctx.fillText(text, drawX + padding, drawY + drawH - labelHeight / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText(text, labelX + labelWidth / 2, labelY + labelHeight / 2, labelWidth - padding * 1.2);
             ctx.restore();
           }
         }
@@ -940,33 +1105,8 @@
 
         // 2. 獲取攝影機 (如果開啟)
         if (cameraToggle.checked) {
-          try {
-            const selectedCameraId = cameraDeviceSelect.value;
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                ...(selectedCameraId && { deviceId: { exact: selectedCameraId } })
-              }
-            });
-            if (backgroundEffectSelect.value !== 'none') initSelfieSegmentation();
-            await refreshMediaDevices();
-            webcamVideo.srcObject = cameraStream;
-            webcamContainer.style.display = 'block';
-            // 確保攝影機視窗重製為右下角
-            webcamContainer.style.bottom = '20px';
-            webcamContainer.style.right = '20px';
-            webcamContainer.style.left = 'auto';
-            webcamContainer.style.top = 'auto';
-            webcamContainer.style.visibility = 'visible';
-            isCameraVisible = true;
-            cameraVisibilityBtn.textContent = '隱藏畫面';
-            applyCameraAppearance();
-            applyBackgroundEffect();
-          } catch (e) {
-            alert("無法存取攝影機，可能是權限被拒絕。");
-            cameraToggle.checked = false;
-          }
+          if (!cameraStream) await startCameraPreview(true);
+          if (backgroundEffectSelect.value !== 'none') initSelfieSegmentation();
         } else {
           webcamContainer.style.display = 'none';
         }
