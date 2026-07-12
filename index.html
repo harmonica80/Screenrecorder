@@ -555,6 +555,12 @@
           </a>
         </div>
       </div>
+      <div class="flex justify-end">
+        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+          <i data-lucide="file-video" class="w-4 h-4"></i> 載入本機影片剪輯
+          <input id="editorVideoInput" type="file" accept="video/webm,video/mp4,video/*" class="hidden">
+        </label>
+      </div>
       <!-- 基本影片剪輯 -->
       <div id="editorPanel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 hidden">
         <div class="flex items-center justify-between gap-3 mb-3">
@@ -754,6 +760,7 @@
     const downloadLink = document.getElementById('downloadLink');
     const newRecordBtn = document.getElementById('newRecordBtn');
     const editorPanel = document.getElementById('editorPanel');
+    const editorVideoInput = document.getElementById('editorVideoInput');
     const editorDuration = document.getElementById('editorDuration');
     const editStartInput = document.getElementById('editStartInput');
     const editEndInput = document.getElementById('editEndInput');
@@ -1916,8 +1923,7 @@
       const blob = new Blob(recordedChunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
 
-      playbackVideo.src = url;
-      playbackVideo.load();
+      prepareEditorVideo(url, recordedDurationSeconds);
 
       const baseName = getRecordingBaseName();
       downloadLink.href = url;
@@ -1926,9 +1932,19 @@
       const currentSequence = Math.max(1, Math.min(99, Number(recordingSequenceInput.value) || 1));
       recordingSequenceInput.value = currentSequence >= 99 ? 1 : currentSequence + 1;
       updateFilenamePreview();
+    }
+
+    function prepareEditorVideo(url, fallbackDuration = 0) {
+      playbackVideo.src = url;
+      playbackVideo.load();
+      playbackVideo.classList.remove('hidden');
+      videoPlaceholder.classList.add('hidden');
+      previewContainer.classList.add('hidden');
       editorPanel.classList.remove('hidden');
       splitDownloads.innerHTML = '';
-      editorStatus.textContent = '請設定時間後裁切或分割影片。';
+      editorStatus.textContent = '正在讀取影片資訊…';
+      recordedDurationSeconds = fallbackDuration;
+      editorVideoDuration = 0;
       let editorInitialized = false;
       const setEditorDuration = () => {
         if (editorInitialized) return;
@@ -1967,6 +1983,19 @@
         if (!Number.isFinite(playbackVideo.duration)) playbackVideo.currentTime = 1e10;
       }, 200);
     }
+
+    editorVideoInput.addEventListener('change', () => {
+      const file = editorVideoInput.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      prepareEditorVideo(url, 0);
+      downloadSection.classList.remove('hidden');
+      downloadSection.classList.add('flex');
+      downloadLink.href = url;
+      downloadLink.download = file.name;
+      statusText.textContent = '影片已載入';
+      editorVideoInput.value = '';
+    });
 
     function getEditRange() {
       const duration = editorVideoDuration;
