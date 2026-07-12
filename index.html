@@ -1962,6 +1962,8 @@
         buildTimelineThumbnails().catch(error => console.warn('時間軸縮圖建立失敗：', error));
         updateTimelineSelection();
       };
+      // 錄影完成時已有可靠的實際錄影秒數，先立即建立可操作時間軸。
+      if (fallbackDuration > 0) setEditorDuration();
       playbackVideo.addEventListener('loadedmetadata', setEditorDuration, { once: true });
       let durationRecovered = false;
       playbackVideo.addEventListener('durationchange', () => {
