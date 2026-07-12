@@ -158,7 +158,7 @@
       display: none;
     }
 
-    #timelineTrack { position: relative; height: 112px; overflow: hidden; border-radius: 10px; background: #0f172a; cursor: pointer; }
+    #timelineTrack { position: relative; height: 72px; overflow: hidden; border-radius: 10px; background: #0f172a; cursor: pointer; }
     #timelineCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
     #timelineSelection { position: absolute; top: 0; bottom: 0; border-top: 3px solid #22c55e; border-bottom: 3px solid #22c55e; background: rgba(34,197,94,.08); z-index: 10; pointer-events: none; }
     .timeline-trim-mask { position: absolute; top: 0; bottom: 0; background: rgba(220,38,38,.58); z-index: 15; pointer-events: none; }
@@ -592,27 +592,22 @@
           <div id="timelineTicks" class="flex justify-between text-[10px] text-slate-400 px-1 mt-1"></div>
           <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右藍色把手調整裁切範圍</p>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           <label class="text-xs text-slate-600">開始時間（秒）
             <input id="editStartInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
           </label>
           <label class="text-xs text-slate-600">結束時間（秒）
             <input id="editEndInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
           </label>
+          <label class="text-xs text-slate-600">分割時間（秒）
+            <input id="splitTimeInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+          </label>
         </div>
         <div class="mt-3 flex flex-wrap gap-2">
           <button id="previewEditBtn" type="button" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm">預覽選取區段</button>
           <button id="exportTrimBtn" type="button" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">輸出裁切影片</button>
-        </div>
-        <div class="mt-4 border-t border-slate-100 pt-3">
-          <p class="text-sm font-medium text-slate-700">分割影片</p>
-          <div class="mt-2 flex flex-wrap items-end gap-2">
-            <label class="text-xs text-slate-600">分割時間（秒）
-              <input id="splitTimeInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-36 bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
-            </label>
-            <button id="splitVideoBtn" type="button" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">分割成兩段</button>
-            <button id="splitAtPlayheadBtn" type="button" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm">在播放頭分割</button>
-          </div>
+          <button id="splitAtPlayheadBtn" type="button" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm">在播放頭分割</button>
+          <button id="splitVideoBtn" type="button" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">依指定時間分割</button>
         </div>
         <p id="editorStatus" class="mt-3 text-xs text-slate-500"></p>
         <div id="splitDownloads" class="mt-2 flex flex-wrap gap-2"></div>
@@ -2047,14 +2042,14 @@
     async function buildTimelineThumbnails() {
       if (!editorVideoDuration || !Number.isFinite(playbackVideo.duration)) return;
       const width = Math.max(600, timelineTrack.clientWidth * 2);
-      const height = 96;
+      const height = 72;
       timelineCanvas.width = width;
       timelineCanvas.height = height;
       const context = timelineCanvas.getContext('2d');
       const originalTime = playbackVideo.currentTime;
       for (let index = 0; index < 12; index++) {
         await seekPlayback(playbackVideo.duration * index / 11);
-        context.drawImage(playbackVideo, index * width / 12, 0, width / 12 + 1, height);
+        drawImageCover(context, playbackVideo, index * width / 12, 0, width / 12 + 1, height);
       }
       await seekPlayback(Math.min(originalTime, playbackVideo.duration));
       updateTimelineSelection();
