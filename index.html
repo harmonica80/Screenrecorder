@@ -158,9 +158,6 @@
       display: none;
     }
 
-    #timelineStartRange, #timelineEndRange { pointer-events: auto; opacity: .7; }
-    #timelineStartRange { z-index: 2; }
-    #timelineEndRange { z-index: 1; }
   </style>
 </head>
 
@@ -573,12 +570,11 @@
             <canvas id="timelineCanvas" class="absolute inset-0 w-full h-full"></canvas>
             <div id="timelineSelection" class="absolute top-0 bottom-0 border-2 border-blue-500 bg-blue-500/30 pointer-events-none z-10"></div>
             <div id="timelinePlayhead" class="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none z-20"><span class="absolute -top-1 -left-1.5 w-3 h-3 rounded-full bg-red-500"></span></div>
+            <button id="timelineStartHandle" type="button" aria-label="拖曳裁切開始位置" class="absolute top-0 bottom-0 w-4 -ml-2 bg-blue-600/90 border-x-2 border-white z-30 cursor-ew-resize touch-none"><span class="text-white text-xs">‹</span></button>
+            <button id="timelineEndHandle" type="button" aria-label="拖曳裁切結束位置" class="absolute top-0 bottom-0 w-4 -ml-2 bg-blue-600/90 border-x-2 border-white z-30 cursor-ew-resize touch-none"><span class="text-white text-xs">›</span></button>
           </div>
-          <div class="relative h-5 mt-1">
-            <input id="timelineStartRange" type="range" min="0" max="0" step="0.1" value="0" aria-label="時間軸開始位置" class="absolute inset-x-0 top-0 w-full pointer-events-none accent-blue-600">
-            <input id="timelineEndRange" type="range" min="0" max="0" step="0.1" value="0" aria-label="時間軸結束位置" class="absolute inset-x-0 top-0 w-full pointer-events-none accent-blue-600">
-          </div>
-          <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位播放位置；拖曳下方藍色端點調整裁切範圍</p>
+          <div id="timelineTicks" class="flex justify-between text-[10px] text-slate-400 px-1 mt-1"></div>
+          <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右藍色把手調整裁切範圍</p>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <label class="text-xs text-slate-600">開始時間（秒）
@@ -771,8 +767,9 @@
     const timelineCanvas = document.getElementById('timelineCanvas');
     const timelineSelection = document.getElementById('timelineSelection');
     const timelinePlayhead = document.getElementById('timelinePlayhead');
-    const timelineStartRange = document.getElementById('timelineStartRange');
-    const timelineEndRange = document.getElementById('timelineEndRange');
+    const timelineStartHandle = document.getElementById('timelineStartHandle');
+    const timelineEndHandle = document.getElementById('timelineEndHandle');
+    const timelineTicks = document.getElementById('timelineTicks');
     const timelineEndLabel = document.getElementById('timelineEndLabel');
 
     const timerDisplay = document.getElementById('timer');
@@ -794,6 +791,8 @@
     let audioContext = null;
 
     let totalRecordedTime = 0;
+    let recordedDurationSeconds = 0;
+    let editorVideoDuration = 0;
     let lastResumeTime = 0;
     let timerInterval = null;
     let isPaused = false;
@@ -1897,6 +1896,8 @@
     }
 
     function stopRecording() {
+      if (!isPaused && lastResumeTime) totalRecordedTime += Date.now() - lastResumeTime;
+      recordedDurationSeconds = Math.max(0.1, totalRecordedTime / 1000);
       isRecording = false;
       cancelAnimationFrame(animationFrameId);
       clearInterval(timerInterval);
@@ -1930,28 +1931,45 @@
       editorStatus.textContent = '請設定時間後裁切或分割影片。';
       let editorInitialized = false;
       const setEditorDuration = () => {
-        if (!Number.isFinite(playbackVideo.duration)) return;
         if (editorInitialized) return;
+        const metadataDuration = Number.isFinite(playbackVideo.duration) && playbackVideo.duration > 0 ? playbackVideo.duration : 0;
+        editorVideoDuration = metadataDuration || recordedDurationSeconds;
+        if (!editorVideoDuration) return;
         editorInitialized = true;
-        editorDuration.textContent = `片長：${playbackVideo.duration.toFixed(1)} 秒`;
+        editorDuration.textContent = `片長：${editorVideoDuration.toFixed(1)} 秒`;
         editStartInput.value = '0';
-        editEndInput.value = playbackVideo.duration.toFixed(1);
-        splitTimeInput.value = (playbackVideo.duration / 2).toFixed(1);
-        timelineStartRange.max = playbackVideo.duration;
-        timelineEndRange.max = playbackVideo.duration;
-        timelineEndRange.value = playbackVideo.duration;
-        timelineEndLabel.textContent = formatTimelineTime(playbackVideo.duration);
+        editEndInput.value = editorVideoDuration.toFixed(1);
+        splitTimeInput.value = (editorVideoDuration / 2).toFixed(1);
+        timelineEndLabel.textContent = formatTimelineTime(editorVideoDuration);
+        timelineTicks.innerHTML = Array.from({ length: 6 }, (_, index) => `<span>${formatTimelineTime(editorVideoDuration * index / 5)}</span>`).join('');
         editorStatus.textContent = '時間軸已準備完成，可以點擊或拖曳編輯。';
         buildTimelineThumbnails().catch(error => console.warn('時間軸縮圖建立失敗：', error));
         updateTimelineSelection();
       };
       playbackVideo.addEventListener('loadedmetadata', setEditorDuration, { once: true });
-      if (playbackVideo.readyState >= 1 && Number.isFinite(playbackVideo.duration)) setEditorDuration();
-      setTimeout(setEditorDuration, 500);
+      let durationRecovered = false;
+      playbackVideo.addEventListener('durationchange', () => {
+        if (durationRecovered) return;
+        if (!Number.isFinite(playbackVideo.duration) || playbackVideo.duration <= 0) return;
+        durationRecovered = true;
+        editorVideoDuration = playbackVideo.duration;
+        editorDuration.textContent = `片長：${editorVideoDuration.toFixed(1)} 秒`;
+        editEndInput.value = editorVideoDuration.toFixed(1);
+        timelineEndLabel.textContent = formatTimelineTime(editorVideoDuration);
+        timelineTicks.innerHTML = Array.from({ length: 6 }, (_, index) => `<span>${formatTimelineTime(editorVideoDuration * index / 5)}</span>`).join('');
+        playbackVideo.currentTime = 0;
+        updateTimelineSelection();
+        buildTimelineThumbnails().catch(error => console.warn('時間軸縮圖建立失敗：', error));
+      });
+      if (playbackVideo.readyState >= 1) setEditorDuration();
+      setTimeout(setEditorDuration, 300);
+      setTimeout(() => {
+        if (!Number.isFinite(playbackVideo.duration)) playbackVideo.currentTime = 1e10;
+      }, 200);
     }
 
     function getEditRange() {
-      const duration = playbackVideo.duration;
+      const duration = editorVideoDuration;
       let start = Number(editStartInput.value);
       let end = Number(editEndInput.value);
       if (!Number.isFinite(duration) || duration <= 0) throw new Error('影片尚未準備完成。');
@@ -1967,19 +1985,19 @@
     }
 
     function updateTimelineSelection() {
-      const duration = playbackVideo.duration || 0;
+      const duration = editorVideoDuration;
       if (!duration) return;
       const start = Math.max(0, Math.min(duration, Number(editStartInput.value) || 0));
       const end = Math.max(start, Math.min(duration, Number(editEndInput.value) || duration));
-      timelineStartRange.value = start;
-      timelineEndRange.value = end;
       timelineSelection.style.left = `${start / duration * 100}%`;
       timelineSelection.style.width = `${Math.max(0, (end - start) / duration * 100)}%`;
+      timelineStartHandle.style.left = `${start / duration * 100}%`;
+      timelineEndHandle.style.left = `${end / duration * 100}%`;
       timelinePlayhead.style.left = `${Math.min(100, playbackVideo.currentTime / duration * 100)}%`;
     }
 
     async function buildTimelineThumbnails() {
-      if (!playbackVideo.duration) return;
+      if (!editorVideoDuration || !Number.isFinite(playbackVideo.duration)) return;
       const width = Math.max(600, timelineTrack.clientWidth * 2);
       const height = 96;
       timelineCanvas.width = width;
@@ -2045,17 +2063,28 @@
       } catch (error) { editorStatus.textContent = error.message; }
     });
     [editStartInput, editEndInput].forEach(input => input.addEventListener('input', updateTimelineSelection));
-    timelineStartRange.addEventListener('input', () => {
-      editStartInput.value = Math.min(Number(timelineStartRange.value), Number(editEndInput.value) - 0.1).toFixed(1);
-      updateTimelineSelection();
-    });
-    timelineEndRange.addEventListener('input', () => {
-      editEndInput.value = Math.max(Number(timelineEndRange.value), Number(editStartInput.value) + 0.1).toFixed(1);
-      updateTimelineSelection();
-    });
+    function setupTimelineHandle(handle, edge) {
+      handle.addEventListener('click', event => event.stopPropagation());
+      handle.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        handle.setPointerCapture(event.pointerId);
+      });
+      handle.addEventListener('pointermove', event => {
+        if (!handle.hasPointerCapture(event.pointerId) || !editorVideoDuration) return;
+        const rect = timelineTrack.getBoundingClientRect();
+        const time = Math.max(0, Math.min(editorVideoDuration, (event.clientX - rect.left) / rect.width * editorVideoDuration));
+        if (edge === 'start') editStartInput.value = Math.min(time, Number(editEndInput.value) - 0.1).toFixed(1);
+        else editEndInput.value = Math.max(time, Number(editStartInput.value) + 0.1).toFixed(1);
+        updateTimelineSelection();
+      });
+    }
+    setupTimelineHandle(timelineStartHandle, 'start');
+    setupTimelineHandle(timelineEndHandle, 'end');
     timelineTrack.addEventListener('click', event => {
+      if (!editorVideoDuration) return;
       const rect = timelineTrack.getBoundingClientRect();
-      playbackVideo.currentTime = ((event.clientX - rect.left) / rect.width) * playbackVideo.duration;
+      playbackVideo.currentTime = ((event.clientX - rect.left) / rect.width) * editorVideoDuration;
       updateTimelineSelection();
     });
     playbackVideo.addEventListener('timeupdate', updateTimelineSelection);
@@ -2072,7 +2101,7 @@
     splitVideoBtn.addEventListener('click', async () => {
       try {
         const split = Number(splitTimeInput.value);
-        const duration = playbackVideo.duration;
+        const duration = editorVideoDuration;
         if (!Number.isFinite(split) || split <= 0 || split >= duration) throw new Error('分割時間必須位於影片中間。');
         splitVideoBtn.disabled = true;
         editorStatus.textContent = '正在輸出兩段影片，請稍候…';
