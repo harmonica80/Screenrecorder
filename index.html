@@ -165,6 +165,7 @@
     #timelinePlayhead { position: absolute; top: 0; bottom: 0; width: 3px; background: #facc15; z-index: 25; cursor: ew-resize; touch-action: none; }
     #timelinePlayhead::before { content: ''; position: absolute; top: 0; left: -6px; width: 15px; height: 15px; background: #facc15; clip-path: polygon(0 0,100% 0,50% 100%); }
     .timeline-trim-handle { position: absolute; top: 0; bottom: 0; width: 18px; margin-left: -9px; padding: 0; border: 2px solid white; border-radius: 4px; background: #dc2626; color: white; z-index: 30; cursor: ew-resize; touch-action: none; }
+    #cameraSection { display: flex; flex-direction: column; gap: .5rem; }
 
   </style>
 </head>
@@ -371,7 +372,7 @@
           </div>
 
           <!-- 網路攝影機 -->
-          <div
+          <div id="cameraTogglePanel"
             class="flex items-center justify-between p-3.5 border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl cursor-pointer"
             onclick="document.getElementById('cameraToggle').click()">
             <div class="flex items-center gap-3">
@@ -409,7 +410,7 @@
           </div>
 
           <!-- 錄影前倒數 -->
-          <div
+          <div id="countdownPanel"
             class="flex items-center justify-between p-3.5 border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors rounded-xl cursor-pointer"
             onclick="document.getElementById('countdownToggle').click()">
             <div class="flex items-center gap-3">
@@ -699,6 +700,7 @@
     const sysAudioToggle = document.getElementById('sysAudioToggle');
     const micToggle = document.getElementById('micToggle');
     const cameraToggle = document.getElementById('cameraToggle');
+    const cameraTogglePanel = document.getElementById('cameraTogglePanel');
     const micDeviceSelect = document.getElementById('micDeviceSelect');
     const cameraDeviceSelect = document.getElementById('cameraDeviceSelect');
     const cameraQualitySelect = document.getElementById('cameraQualitySelect');
@@ -720,6 +722,7 @@
     const nameplateOpacity = document.getElementById('nameplateOpacity');
     const nameplateOpacityValue = document.getElementById('nameplateOpacityValue');
     const countdownToggle = document.getElementById('countdownToggle');
+    const countdownPanel = document.getElementById('countdownPanel');
     const countdownSecondsSelect = document.getElementById('countdownSecondsSelect');
     const displaySurfaceMode = document.getElementById('displaySurfaceMode');
     const filenameModeSelect = document.getElementById('filenameModeSelect');
@@ -821,7 +824,15 @@
     const watermarkImage = new Image();
     let segmentationLoopId = null;
 
-    cameraControls.after(watermarkPanel);
+    // 重新排列設定：倒數、浮水印置於攝影機上方，子母畫面設定併入攝影機區塊。
+    const cameraSection = document.createElement('div');
+    cameraSection.id = 'cameraSection';
+    cameraSection.className = 'space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/20 p-1.5';
+    const settingsList = cameraTogglePanel.parentElement;
+    settingsList.insertBefore(cameraSection, cameraTogglePanel);
+    cameraSection.append(cameraTogglePanel, cameraControls);
+    settingsList.insertBefore(countdownPanel, cameraSection);
+    settingsList.insertBefore(watermarkPanel, cameraSection);
 
     function setupCollapsiblePanel(panel, button, storageKey) {
       const applyState = collapsed => {
@@ -840,6 +851,8 @@
     setupCollapsiblePanel(cameraControls, cameraPanelToggle, 'screenRecorderCameraPanelCollapsedV2');
     setupCollapsiblePanel(watermarkPanel, watermarkPanelToggle, 'screenRecorderWatermarkPanelCollapsedV2');
     setupCollapsiblePanel(recordingAdvancedPanel, recordingAdvancedPanelToggle, 'screenRecorderAdvancedPanelCollapsedV1');
+    // 攝影機關閉時一律以收合狀態開始。
+    if (!cameraControls.classList.contains('panel-collapsed')) cameraPanelToggle.click();
     let isCameraVisible = true;
     let selfieSegmentation = null;
     let segmentationMask = null;
@@ -1074,6 +1087,14 @@
       cameraDeviceSelect.disabled = !cameraToggle.checked;
       cameraQualitySelect.disabled = !cameraToggle.checked;
       cameraControls.classList.toggle('opacity-50', !cameraToggle.checked);
+      cameraPanelToggle.disabled = false;
+      const collapsed = cameraControls.classList.contains('panel-collapsed');
+      if (cameraToggle.checked && collapsed) cameraPanelToggle.click();
+      if (!cameraToggle.checked && !collapsed) {
+        cameraPanelToggle.click();
+      }
+      cameraPanelToggle.disabled = !cameraToggle.checked;
+      cameraPanelToggle.classList.toggle('opacity-50', !cameraToggle.checked);
     }
 
     micToggle.addEventListener('change', syncDeviceSelectStates);
