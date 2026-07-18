@@ -810,6 +810,7 @@
     let totalRecordedTime = 0;
     let recordedDurationSeconds = 0;
     let editorVideoDuration = 0;
+    let isBuildingTimeline = false;
     let lastResumeTime = 0;
     let timerInterval = null;
     let isPaused = false;
@@ -1963,8 +1964,6 @@
     }
 
     function prepareEditorVideo(url, fallbackDuration = 0) {
-      playbackVideo.src = url;
-      playbackVideo.load();
       playbackVideo.classList.remove('hidden');
       videoPlaceholder.classList.add('hidden');
       previewContainer.classList.add('hidden');
@@ -1993,6 +1992,14 @@
       // 錄影完成時已有可靠的實際錄影秒數，先立即建立可操作時間軸。
       if (fallbackDuration > 0) setEditorDuration();
       playbackVideo.addEventListener('loadedmetadata', setEditorDuration, { once: true });
+      playbackVideo.addEventListener('loadeddata', async () => {
+        const firstFrameTime = Math.min(0.05, Math.max(0, (playbackVideo.duration || editorVideoDuration) - 0.01));
+        if (firstFrameTime > 0) await seekPlayback(firstFrameTime);
+        if ('requestVideoFrameCallback' in playbackVideo) {
+          await new Promise(resolve => playbackVideo.requestVideoFrameCallback(resolve));
+        }
+        await buildTimelineThumbnails().catch(error => console.warn('時間軸縮圖建立失敗：', error));
+      }, { once: true });
       let durationRecovered = false;
       playbackVideo.addEventListener('durationchange', () => {
         if (durationRecovered) return;
@@ -2003,11 +2010,13 @@
         editEndInput.value = editorVideoDuration.toFixed(1);
         timelineEndLabel.textContent = formatTimelineTime(editorVideoDuration);
         timelineTicks.innerHTML = Array.from({ length: 6 }, (_, index) => `<span>${formatTimelineTime(editorVideoDuration * index / 5)}</span>`).join('');
-        playbackVideo.currentTime = 0;
         updateTimelineSelection();
         buildTimelineThumbnails().catch(error => console.warn('時間軸縮圖建立失敗：', error));
       });
-      if (playbackVideo.readyState >= 1) setEditorDuration();
+      // 先完成事件綁定，再載入來源，避免短影片太快觸發事件而漏接。
+      playbackVideo.src = url;
+      playbackVideo.preload = 'auto';
+      playbackVideo.load();
       setTimeout(setEditorDuration, 300);
       setTimeout(() => {
         if (!Number.isFinite(playbackVideo.duration)) playbackVideo.currentTime = 1e10;
@@ -2019,8 +2028,8 @@
       if (!file) return;
       const url = URL.createObjectURL(file);
       prepareEditorVideo(url, 0);
-      downloadSection.classList.remove('hidden');
-      downloadSection.classList.add('flex');
+      downloadSection.classList.add('hidden');
+      downloadSection.classList.remove('flex');
       downloadLink.href = url;
       downloadLink.download = file.name;
       statusText.textContent = '影片已載入';
@@ -2059,19 +2068,24 @@
     }
 
     async function buildTimelineThumbnails() {
-      if (!editorVideoDuration || !Number.isFinite(playbackVideo.duration)) return;
+      if (isBuildingTimeline || !editorVideoDuration || !Number.isFinite(playbackVideo.duration) || playbackVideo.readyState < 2) return;
+      isBuildingTimeline = true;
       const width = Math.max(600, timelineTrack.clientWidth * 2);
       const height = 72;
       timelineCanvas.width = width;
       timelineCanvas.height = height;
       const context = timelineCanvas.getContext('2d');
       const originalTime = playbackVideo.currentTime;
-      for (let index = 0; index < 12; index++) {
-        await seekPlayback(playbackVideo.duration * index / 11);
-        drawImageCover(context, playbackVideo, index * width / 12, 0, width / 12 + 1, height);
+      try {
+        for (let index = 0; index < 12; index++) {
+          await seekPlayback(Math.min(playbackVideo.duration - 0.05, playbackVideo.duration * index / 11));
+          drawImageCover(context, playbackVideo, index * width / 12, 0, width / 12 + 1, height);
+        }
+        await seekPlayback(Math.min(originalTime, playbackVideo.duration));
+        updateTimelineSelection();
+      } finally {
+        isBuildingTimeline = false;
       }
-      await seekPlayback(Math.min(originalTime, playbackVideo.duration));
-      updateTimelineSelection();
     }
 
     function seekPlayback(time) {
