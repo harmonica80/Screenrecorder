@@ -527,6 +527,10 @@
             <i data-lucide="radio" class="w-5 h-5"></i>
             開始擷取與錄製
           </button>
+          <label class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer whitespace-nowrap">
+            <i data-lucide="file-video" class="w-5 h-5"></i> 載入本機影片剪輯
+            <input id="editorVideoInput" type="file" accept="video/webm,video/mp4,video/*" class="hidden">
+          </label>
           <div class="grid grid-cols-2 gap-3 hidden" id="recordingControls">
             <button id="pauseBtn"
               class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-5 rounded-xl flex items-center justify-center gap-2 transition-all whitespace-nowrap">
@@ -563,12 +567,6 @@
             <i data-lucide="download" class="w-5 h-5"></i> 下載影片檔
           </a>
         </div>
-      </div>
-      <div class="flex justify-end">
-        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
-          <i data-lucide="file-video" class="w-4 h-4"></i> 載入本機影片剪輯
-          <input id="editorVideoInput" type="file" accept="video/webm,video/mp4,video/*" class="hidden">
-        </label>
       </div>
       <!-- 基本影片剪輯 -->
       <div id="editorPanel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 hidden">
