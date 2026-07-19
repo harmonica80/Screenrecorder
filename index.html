@@ -2088,6 +2088,7 @@
       const thumbnailVideo = document.createElement('video');
       thumbnailVideo.muted = true;
       thumbnailVideo.preload = 'auto';
+      let timelineCompleted = false;
       try {
         await new Promise((resolve, reject) => {
           thumbnailVideo.addEventListener('loadeddata', resolve, { once: true });
@@ -2096,8 +2097,15 @@
           thumbnailVideo.load();
         });
         if (loadGeneration !== editorLoadGeneration) return;
+        // MediaRecorder 產生的 WebM 常先回報 Infinity；先觸發瀏覽器掃描實際結尾。
+        if (!Number.isFinite(thumbnailVideo.duration)) {
+          await recoverVideoDuration(thumbnailVideo);
+        }
+        const samplingDuration = Number.isFinite(thumbnailVideo.duration) && thumbnailVideo.duration > 0
+          ? thumbnailVideo.duration
+          : editorVideoDuration;
         for (let index = 0; index < 12; index++) {
-          const sampleTime = Math.max(0, Math.min(thumbnailVideo.duration - 0.05, thumbnailVideo.duration * index / 11));
+          const sampleTime = Math.max(0.01, Math.min(Math.max(0.01, samplingDuration - 0.05), samplingDuration * index / 11 || 0.01));
           await seekVideoElement(thumbnailVideo, sampleTime);
           if (loadGeneration !== editorLoadGeneration) return;
           drawImageCover(context, thumbnailVideo, index * width / 12, 0, width / 12 + 1, height);
@@ -2106,12 +2114,37 @@
         timelineCanvas.width = width;
         timelineCanvas.height = height;
         timelineCanvas.getContext('2d').drawImage(thumbnailCanvas, 0, 0);
+        timelineCompleted = true;
         updateTimelineSelection();
       } finally {
         thumbnailVideo.removeAttribute('src');
         thumbnailVideo.load();
-        if (timelineBuildGeneration === loadGeneration && loadGeneration !== editorLoadGeneration) timelineBuildGeneration = -1;
+        if (timelineBuildGeneration === loadGeneration && (!timelineCompleted || loadGeneration !== editorLoadGeneration)) timelineBuildGeneration = -1;
       }
+    }
+
+    function recoverVideoDuration(video) {
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled || !Number.isFinite(video.duration)) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          video.removeEventListener('durationchange', finish);
+          video.removeEventListener('seeked', finish);
+          resolve();
+        };
+        const timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          video.removeEventListener('durationchange', finish);
+          video.removeEventListener('seeked', finish);
+          resolve();
+        }, 1200);
+        video.addEventListener('durationchange', finish);
+        video.addEventListener('seeked', finish);
+        video.currentTime = 1e10;
+      });
     }
 
     function seekVideoElement(video, time) {
