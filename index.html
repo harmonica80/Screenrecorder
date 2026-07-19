@@ -163,6 +163,9 @@
     #waveformTrack { position: relative; height: 46px; margin-top: 4px; overflow: hidden; border-radius: 8px; background: #0f172a; }
     #waveformCanvas { display: block; width: 100%; height: 100%; }
     #waveformStatus { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px; pointer-events: none; }
+    #volumeGainLine { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border: 0; padding: 0; background: #ef4444; box-shadow: 0 0 0 1px rgba(255,255,255,.35); cursor: ns-resize; z-index: 5; touch-action: none; }
+    #volumeGainLine::after { content: ''; position: absolute; right: 6px; top: 50%; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; background: #ef4444; transform: translateY(-50%); }
+    #volumeGainValue { position: absolute; right: 25px; top: 50%; padding: 1px 5px; border-radius: 4px; color: white; background: rgba(15,23,42,.82); font-size: 10px; line-height: 1.4; transform: translateY(-50%); pointer-events: none; }
     #timelineSelection { position: absolute; top: 0; bottom: 0; border-top: 3px solid #22c55e; border-bottom: 3px solid #22c55e; background: rgba(34,197,94,.08); z-index: 10; pointer-events: none; }
     .timeline-trim-mask { position: absolute; top: 0; bottom: 0; background: rgba(220,38,38,.58); z-index: 15; pointer-events: none; }
     #timelinePlayhead { position: absolute; top: 0; bottom: 0; width: 3px; background: #facc15; z-index: 25; cursor: ew-resize; touch-action: none; }
@@ -594,6 +597,9 @@
           <div id="waveformTrack" aria-label="影片音訊波形">
             <canvas id="waveformCanvas"></canvas>
             <span id="waveformStatus">正在分析音訊…</span>
+            <button id="volumeGainLine" type="button" role="slider" aria-label="輸出音量" aria-valuemin="0" aria-valuemax="200" aria-valuenow="100">
+              <span id="volumeGainValue">音量 100%</span>
+            </button>
           </div>
           <div id="timelineTicks" class="flex justify-between text-[10px] text-slate-400 px-1 mt-1"></div>
           <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右藍色把手調整裁切範圍</p>
@@ -614,6 +620,7 @@
           <button id="exportTrimBtn" type="button" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">輸出裁切影片</button>
           <button id="splitAtPlayheadBtn" type="button" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm">在播放頭分割</button>
           <button id="splitVideoBtn" type="button" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">依指定時間分割</button>
+          <button id="exportVolumeBtn" type="button" class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm">輸出音量調整影片</button>
         </div>
         <p id="editorStatus" class="mt-3 text-xs text-slate-500"></p>
         <div id="splitDownloads" class="mt-2 flex flex-wrap gap-2"></div>
@@ -796,6 +803,10 @@
     const timelineEndLabel = document.getElementById('timelineEndLabel');
     const waveformCanvas = document.getElementById('waveformCanvas');
     const waveformStatus = document.getElementById('waveformStatus');
+    const waveformTrack = document.getElementById('waveformTrack');
+    const volumeGainLine = document.getElementById('volumeGainLine');
+    const volumeGainValue = document.getElementById('volumeGainValue');
+    const exportVolumeBtn = document.getElementById('exportVolumeBtn');
     const splitAtPlayheadBtn = document.getElementById('splitAtPlayheadBtn');
 
     const timerDisplay = document.getElementById('timer');
@@ -822,6 +833,7 @@
     let editorLoadGeneration = 0;
     let timelineBuildGeneration = -1;
     let waveformBuildGeneration = -1;
+    let volumeGainPercent = 100;
     let lastResumeTime = 0;
     let timerInterval = null;
     let isPaused = false;
@@ -2241,10 +2253,54 @@
       });
     }
 
-    async function renderEditedClip(start, end, label) {
+    function setVolumeGain(percent) {
+      volumeGainPercent = Math.max(0, Math.min(200, Math.round(percent / 5) * 5));
+      volumeGainLine.style.top = `${100 - volumeGainPercent / 2}%`;
+      volumeGainLine.setAttribute('aria-valuenow', String(volumeGainPercent));
+      volumeGainValue.textContent = `音量 ${volumeGainPercent}%`;
+    }
+
+    function setVolumeGainFromPointer(event) {
+      const rect = waveformTrack.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+      setVolumeGain((1 - ratio) * 200);
+    }
+
+    waveformTrack.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      waveformTrack.setPointerCapture(event.pointerId);
+      setVolumeGainFromPointer(event);
+    });
+    waveformTrack.addEventListener('pointermove', event => {
+      if (waveformTrack.hasPointerCapture(event.pointerId)) setVolumeGainFromPointer(event);
+    });
+    volumeGainLine.addEventListener('keydown', event => {
+      if (!['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === 'Home') setVolumeGain(0);
+      else if (event.key === 'End') setVolumeGain(200);
+      else setVolumeGain(volumeGainPercent + (['ArrowUp', 'ArrowRight'].includes(event.key) ? 5 : -5));
+    });
+    setVolumeGain(100);
+
+    async function renderEditedClip(start, end, label, outputVolumePercent = 100) {
       if (!playbackVideo.captureStream) throw new Error('此瀏覽器不支援影片重新輸出。請使用最新版 Chrome 或 Edge。');
       await seekPlayback(start);
-      const stream = playbackVideo.captureStream();
+      const sourceStream = playbackVideo.captureStream();
+      const outputTracks = [...sourceStream.getVideoTracks()];
+      let volumeContext = null;
+      if (sourceStream.getAudioTracks().length) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        volumeContext = new AudioContextClass();
+        if (volumeContext.state === 'suspended') await volumeContext.resume();
+        const audioSource = volumeContext.createMediaStreamSource(new MediaStream(sourceStream.getAudioTracks()));
+        const gainNode = volumeContext.createGain();
+        const audioDestination = volumeContext.createMediaStreamDestination();
+        gainNode.gain.value = Math.max(0, Math.min(2, outputVolumePercent / 100));
+        audioSource.connect(gainNode).connect(audioDestination);
+        outputTracks.push(...audioDestination.stream.getAudioTracks());
+      }
+      const stream = new MediaStream(outputTracks);
       const mimeType = MediaRecorder.isTypeSupported(recordingMimeType) ? recordingMimeType : 'video/webm';
       const chunks = [];
       const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6000000, audioBitsPerSecond: 128000 });
@@ -2260,6 +2316,8 @@
       const blob = await result;
       playbackVideo.pause();
       stream.getTracks().forEach(track => track.stop());
+      sourceStream.getTracks().forEach(track => track.stop());
+      if (volumeContext && volumeContext.state !== 'closed') await volumeContext.close();
       return { blob, extension: mimeType.includes('mp4') ? 'mp4' : 'webm', label };
     }
 
@@ -2349,6 +2407,16 @@
         editorStatus.textContent = '分割完成，可以分別下載兩段影片。';
       } catch (error) { editorStatus.textContent = error.message; }
       finally { splitVideoBtn.disabled = false; }
+    });
+    exportVolumeBtn.addEventListener('click', async () => {
+      try {
+        const { start, end } = getEditRange();
+        exportVolumeBtn.disabled = true;
+        editorStatus.textContent = `正在以 ${volumeGainPercent}% 音量重新輸出影片，請稍候…`;
+        addEditorDownload(await renderEditedClip(start, end, `音量${volumeGainPercent}`, volumeGainPercent));
+        editorStatus.textContent = `音量調整完成（${volumeGainPercent}%），可以下載。`;
+      } catch (error) { editorStatus.textContent = error.message; }
+      finally { exportVolumeBtn.disabled = false; }
     });
 
     // 事件綁定
