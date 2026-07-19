@@ -2425,14 +2425,13 @@
       const coreURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
       if (!fastCoreUrls) {
         fastCoreUrls = {
-          coreURL: await fetchAsBlobUrl(`${coreURL}/ffmpeg-core.js`, 'text/javascript', '下載快速輸出程式'),
           wasmURL: await fetchAsBlobUrl(`${coreURL}/ffmpeg-core.wasm`, 'application/wasm', '下載快速輸出核心')
         };
       }
       editorStatus.textContent = '正在啟動快速輸出引擎…';
       const loadPromise = fastFfmpeg.load({
         classWorkerURL: new URL('assets/ffmpeg/814.ffmpeg.js', window.location.href).href,
-        coreURL: fastCoreUrls.coreURL,
+        coreURL: new URL('assets/ffmpeg/ffmpeg-core.js', window.location.href).href,
         wasmURL: fastCoreUrls.wasmURL
       });
       try {
@@ -2498,7 +2497,8 @@
         return await renderFastClip(start, end, label, useVolumeEnvelope);
       } catch (error) {
         console.warn('快速輸出失敗：', error);
-        throw new Error(`快速處理無法執行：${error.message} 請改選「相容模式」後重試。`);
+        const errorMessage = error instanceof Error ? error.message : String(error ?? '未知錯誤');
+        throw new Error(`快速處理無法執行：${errorMessage} 請改選「相容模式」後重試。`);
       }
     }
 
