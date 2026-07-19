@@ -2612,8 +2612,8 @@
         const { start, end } = getEditRange();
         exportTrimBtn.disabled = true;
         editorStatus.textContent = '正在輸出裁切影片，請稍候…';
-        addEditorDownload(await renderClip(start, end, '裁切'));
-        editorStatus.textContent = '裁切完成，可以下載。';
+        addEditorDownload(await renderClip(start, end, '裁切', true));
+        editorStatus.textContent = '裁切與音量調整完成，可以下載。';
       } catch (error) { editorStatus.textContent = error.message; }
       finally { exportTrimBtn.disabled = false; }
     });
@@ -2625,9 +2625,9 @@
         splitVideoBtn.disabled = true;
         editorStatus.textContent = '正在輸出兩段影片，請稍候…';
         splitDownloads.innerHTML = '';
-        addEditorDownload(await renderClip(0, split, '第1段'));
-        addEditorDownload(await renderClip(split, duration, '第2段'));
-        editorStatus.textContent = '分割完成，可以分別下載兩段影片。';
+        addEditorDownload(await renderClip(0, split, '第1段', true));
+        addEditorDownload(await renderClip(split, duration, '第2段', true));
+        editorStatus.textContent = '分割與音量調整完成，可以分別下載兩段影片。';
       } catch (error) { editorStatus.textContent = error.message; }
       finally { splitVideoBtn.disabled = false; }
     });
