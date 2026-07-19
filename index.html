@@ -2431,7 +2431,7 @@
       editorStatus.textContent = '正在啟動快速輸出引擎…';
       const loadPromise = fastFfmpeg.load({
         classWorkerURL: new URL('assets/ffmpeg/814.ffmpeg.js', window.location.href).href,
-        coreURL: new URL('assets/ffmpeg/ffmpeg-core.js', window.location.href).href,
+        coreURL: new URL('assets/ffmpeg/ffmpeg-core-esm.js', window.location.href).href,
         wasmURL: fastCoreUrls.wasmURL
       });
       try {
