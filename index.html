@@ -2393,21 +2393,25 @@
     async function getFastFfmpeg() {
       if (fastFfmpeg?.loaded) return fastFfmpeg;
       editorStatus.textContent = '正在載入快速輸出引擎（首次約 31 MB）…';
-      await loadExternalScriptOnce('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js', 'FFmpegWASM');
-      await loadExternalScriptOnce('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js', 'FFmpegUtil');
+      await loadExternalScriptOnce('assets/ffmpeg/ffmpeg.js', 'FFmpegWASM');
+      await loadExternalScriptOnce('assets/ffmpeg/util.js', 'FFmpegUtil');
       const { FFmpeg } = window.FFmpegWASM;
       const { toBlobURL } = window.FFmpegUtil;
       fastFfmpeg = new FFmpeg();
       fastFfmpeg.on('progress', ({ progress }) => {
         if (progress >= 0 && progress <= 1) editorStatus.textContent = `快速處理中：${Math.round(progress * 100)}%`;
       });
-      const libraryURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd';
       const coreURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
-      await fastFfmpeg.load({
-        classWorkerURL: await toBlobURL(`${libraryURL}/814.ffmpeg.js`, 'text/javascript'),
+      editorStatus.textContent = '正在下載快速輸出核心（約 31 MB）…';
+      const loadPromise = fastFfmpeg.load({
+        classWorkerURL: new URL('assets/ffmpeg/814.ffmpeg.js', window.location.href).href,
         coreURL: await toBlobURL(`${coreURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${coreURL}/ffmpeg-core.wasm`, 'application/wasm')
       });
+      await Promise.race([
+        loadPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('快速輸出核心載入逾時，請檢查網路後重試。')), 120000))
+      ]);
       return fastFfmpeg;
     }
 
