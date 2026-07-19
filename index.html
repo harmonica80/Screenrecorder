@@ -163,9 +163,10 @@
     #waveformTrack { position: relative; height: 46px; margin-top: 4px; overflow: hidden; border-radius: 8px; background: #0f172a; }
     #waveformCanvas { display: block; width: 100%; height: 100%; }
     #waveformStatus { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px; pointer-events: none; }
-    #volumeGainLine { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border: 0; padding: 0; background: #ef4444; box-shadow: 0 0 0 1px rgba(255,255,255,.35); cursor: ns-resize; z-index: 5; touch-action: none; }
-    #volumeGainLine::after { content: ''; position: absolute; right: 6px; top: 50%; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; background: #ef4444; transform: translateY(-50%); }
-    #volumeGainValue { position: absolute; right: 25px; top: 50%; padding: 1px 5px; border-radius: 4px; color: white; background: rgba(15,23,42,.82); font-size: 10px; line-height: 1.4; transform: translateY(-50%); pointer-events: none; }
+    #volumeEnvelopeSvg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; cursor: crosshair; touch-action: none; }
+    #volumeEnvelopeLine { fill: none; stroke: #ef4444; stroke-width: 4; vector-effect: non-scaling-stroke; }
+    .volume-envelope-node { fill: #ef4444; stroke: white; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }
+    #volumeGainValue { position: absolute; right: 6px; top: 4px; z-index: 6; padding: 1px 5px; border-radius: 4px; color: white; background: rgba(15,23,42,.82); font-size: 10px; line-height: 1.4; pointer-events: none; }
     #timelineSelection { position: absolute; top: 0; bottom: 0; border-top: 3px solid #22c55e; border-bottom: 3px solid #22c55e; background: rgba(34,197,94,.08); z-index: 10; pointer-events: none; }
     .timeline-trim-mask { position: absolute; top: 0; bottom: 0; background: rgba(220,38,38,.58); z-index: 15; pointer-events: none; }
     #timelinePlayhead { position: absolute; top: 0; bottom: 0; width: 3px; background: #facc15; z-index: 25; cursor: ew-resize; touch-action: none; }
@@ -597,12 +598,14 @@
           <div id="waveformTrack" aria-label="影片音訊波形">
             <canvas id="waveformCanvas"></canvas>
             <span id="waveformStatus">正在分析音訊…</span>
-            <button id="volumeGainLine" type="button" role="slider" aria-label="輸出音量" aria-valuemin="0" aria-valuemax="200" aria-valuenow="100">
-              <span id="volumeGainValue">音量 100%</span>
-            </button>
+            <svg id="volumeEnvelopeSvg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-label="局部音量調整線">
+              <polyline id="volumeEnvelopeLine" points="0,50 1000,50"></polyline>
+              <g id="volumeEnvelopeNodes"></g>
+            </svg>
+            <span id="volumeGainValue">點擊加入音量節點</span>
           </div>
           <div id="timelineTicks" class="flex justify-between text-[10px] text-slate-400 px-1 mt-1"></div>
-          <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右藍色把手調整裁切範圍</p>
+          <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右把手裁切。點擊聲波新增音量節點、拖曳調整，右鍵刪除節點。</p>
         </div>
         <div class="grid grid-cols-3 gap-3">
           <label class="text-xs text-slate-600">開始時間（秒）
@@ -804,7 +807,9 @@
     const waveformCanvas = document.getElementById('waveformCanvas');
     const waveformStatus = document.getElementById('waveformStatus');
     const waveformTrack = document.getElementById('waveformTrack');
-    const volumeGainLine = document.getElementById('volumeGainLine');
+    const volumeEnvelopeSvg = document.getElementById('volumeEnvelopeSvg');
+    const volumeEnvelopeLine = document.getElementById('volumeEnvelopeLine');
+    const volumeEnvelopeNodes = document.getElementById('volumeEnvelopeNodes');
     const volumeGainValue = document.getElementById('volumeGainValue');
     const exportVolumeBtn = document.getElementById('exportVolumeBtn');
     const splitAtPlayheadBtn = document.getElementById('splitAtPlayheadBtn');
@@ -833,7 +838,8 @@
     let editorLoadGeneration = 0;
     let timelineBuildGeneration = -1;
     let waveformBuildGeneration = -1;
-    let volumeGainPercent = 100;
+    let volumeEnvelopePoints = [];
+    let activeVolumeNode = null;
     let lastResumeTime = 0;
     let timerInterval = null;
     let isPaused = false;
@@ -1995,6 +2001,7 @@
       waveformStatus.textContent = '正在分析音訊…';
       waveformStatus.hidden = false;
       waveformBuildGeneration = -1;
+      initializeVolumeEnvelope();
       buildAudioWaveform(loadGeneration, url).catch(error => console.warn('音訊波形建立失敗：', error));
       playbackVideo.classList.remove('hidden');
       videoPlaceholder.classList.add('hidden');
@@ -2253,50 +2260,117 @@
       });
     }
 
-    function setVolumeGain(percent) {
-      volumeGainPercent = Math.max(0, Math.min(200, Math.round(percent / 5) * 5));
-      volumeGainLine.style.top = `${100 - volumeGainPercent / 2}%`;
-      volumeGainLine.setAttribute('aria-valuenow', String(volumeGainPercent));
-      volumeGainValue.textContent = `音量 ${volumeGainPercent}%`;
+    function initializeVolumeEnvelope() {
+      volumeEnvelopePoints = [
+        { position: 0, gain: 100, fixed: true },
+        { position: 1, gain: 100, fixed: true }
+      ];
+      activeVolumeNode = null;
+      renderVolumeEnvelope();
     }
 
-    function setVolumeGainFromPointer(event) {
+    function renderVolumeEnvelope(selectedNode = activeVolumeNode) {
+      volumeEnvelopePoints.sort((a, b) => a.position - b.position);
+      volumeEnvelopeLine.setAttribute('points', volumeEnvelopePoints.map(point => `${point.position * 1000},${100 - point.gain / 2}`).join(' '));
+      volumeEnvelopeNodes.replaceChildren();
+      volumeEnvelopePoints.forEach(point => {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        node.setAttribute('cx', point.position * 1000);
+        node.setAttribute('cy', 100 - point.gain / 2);
+        node.setAttribute('rx', point === selectedNode ? 10 : 8);
+        node.setAttribute('ry', point === selectedNode ? 16 : 13);
+        node.classList.add('volume-envelope-node');
+        volumeEnvelopeNodes.appendChild(node);
+      });
+      if (selectedNode) {
+        const time = selectedNode.position * editorVideoDuration;
+        volumeGainValue.textContent = `${formatTimelineTime(time)} · 音量 ${selectedNode.gain}%`;
+      } else {
+        volumeGainValue.textContent = '點擊加入音量節點';
+      }
+    }
+
+    function getEnvelopePointer(event) {
       const rect = waveformTrack.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-      setVolumeGain((1 - ratio) * 200);
+      return {
+        position: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+        gain: Math.max(0, Math.min(200, Math.round((1 - (event.clientY - rect.top) / rect.height) * 40) * 5))
+      };
+    }
+
+    function findVolumeNode(event, includeFixed = true) {
+      const rect = waveformTrack.getBoundingClientRect();
+      return volumeEnvelopePoints.find(point => {
+        if (!includeFixed && point.fixed) return false;
+        const x = rect.left + point.position * rect.width;
+        const y = rect.top + (1 - point.gain / 200) * rect.height;
+        return Math.hypot(event.clientX - x, event.clientY - y) <= 14;
+      });
     }
 
     waveformTrack.addEventListener('pointerdown', event => {
       event.preventDefault();
+      activeVolumeNode = findVolumeNode(event) || { ...getEnvelopePointer(event), fixed: false };
+      if (!volumeEnvelopePoints.includes(activeVolumeNode)) volumeEnvelopePoints.push(activeVolumeNode);
       waveformTrack.setPointerCapture(event.pointerId);
-      setVolumeGainFromPointer(event);
+      renderVolumeEnvelope(activeVolumeNode);
     });
     waveformTrack.addEventListener('pointermove', event => {
-      if (waveformTrack.hasPointerCapture(event.pointerId)) setVolumeGainFromPointer(event);
+      if (!waveformTrack.hasPointerCapture(event.pointerId) || !activeVolumeNode) return;
+      const pointer = getEnvelopePointer(event);
+      if (!activeVolumeNode.fixed) activeVolumeNode.position = Math.max(0.001, Math.min(0.999, pointer.position));
+      activeVolumeNode.gain = pointer.gain;
+      renderVolumeEnvelope(activeVolumeNode);
     });
-    volumeGainLine.addEventListener('keydown', event => {
-      if (!['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+    waveformTrack.addEventListener('pointerup', event => {
+      if (waveformTrack.hasPointerCapture(event.pointerId)) waveformTrack.releasePointerCapture(event.pointerId);
+      renderVolumeEnvelope(activeVolumeNode);
+    });
+    waveformTrack.addEventListener('contextmenu', event => {
       event.preventDefault();
-      if (event.key === 'Home') setVolumeGain(0);
-      else if (event.key === 'End') setVolumeGain(200);
-      else setVolumeGain(volumeGainPercent + (['ArrowUp', 'ArrowRight'].includes(event.key) ? 5 : -5));
+      const node = findVolumeNode(event, false);
+      if (!node) return;
+      volumeEnvelopePoints = volumeEnvelopePoints.filter(point => point !== node);
+      activeVolumeNode = null;
+      renderVolumeEnvelope();
     });
-    setVolumeGain(100);
+    initializeVolumeEnvelope();
 
-    async function renderEditedClip(start, end, label, outputVolumePercent = 100) {
+    function getEnvelopeGainAt(seconds) {
+      const position = editorVideoDuration ? seconds / editorVideoDuration : 0;
+      const points = [...volumeEnvelopePoints].sort((a, b) => a.position - b.position);
+      const rightIndex = points.findIndex(point => point.position >= position);
+      if (rightIndex <= 0) return points[0]?.gain ?? 100;
+      const left = points[rightIndex - 1];
+      const right = points[rightIndex];
+      const ratio = (position - left.position) / Math.max(0.000001, right.position - left.position);
+      return left.gain + (right.gain - left.gain) * ratio;
+    }
+
+    function scheduleVolumeEnvelope(gainParam, start, end, startedAt) {
+      gainParam.cancelScheduledValues(startedAt);
+      gainParam.setValueAtTime(getEnvelopeGainAt(start) / 100, startedAt);
+      volumeEnvelopePoints
+        .filter(point => point.position * editorVideoDuration > start && point.position * editorVideoDuration < end)
+        .sort((a, b) => a.position - b.position)
+        .forEach(point => gainParam.linearRampToValueAtTime(point.gain / 100, startedAt + point.position * editorVideoDuration - start));
+      gainParam.linearRampToValueAtTime(getEnvelopeGainAt(end) / 100, startedAt + end - start);
+    }
+
+    async function renderEditedClip(start, end, label, useVolumeEnvelope = false) {
       if (!playbackVideo.captureStream) throw new Error('此瀏覽器不支援影片重新輸出。請使用最新版 Chrome 或 Edge。');
       await seekPlayback(start);
       const sourceStream = playbackVideo.captureStream();
       const outputTracks = [...sourceStream.getVideoTracks()];
       let volumeContext = null;
+      let gainNode = null;
       if (sourceStream.getAudioTracks().length) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         volumeContext = new AudioContextClass();
         if (volumeContext.state === 'suspended') await volumeContext.resume();
         const audioSource = volumeContext.createMediaStreamSource(new MediaStream(sourceStream.getAudioTracks()));
-        const gainNode = volumeContext.createGain();
+        gainNode = volumeContext.createGain();
         const audioDestination = volumeContext.createMediaStreamDestination();
-        gainNode.gain.value = Math.max(0, Math.min(2, outputVolumePercent / 100));
         audioSource.connect(gainNode).connect(audioDestination);
         outputTracks.push(...audioDestination.stream.getAudioTracks());
       }
@@ -2310,6 +2384,10 @@
         recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
       });
       await playbackVideo.play();
+      if (gainNode) {
+        if (useVolumeEnvelope) scheduleVolumeEnvelope(gainNode.gain, start, end, volumeContext.currentTime);
+        else gainNode.gain.setValueAtTime(1, volumeContext.currentTime);
+      }
       recorder.start(250);
       await new Promise(resolve => setTimeout(resolve, Math.max(100, (end - start) * 1000)));
       if (recorder.state !== 'inactive') recorder.stop();
@@ -2412,9 +2490,9 @@
       try {
         const { start, end } = getEditRange();
         exportVolumeBtn.disabled = true;
-        editorStatus.textContent = `正在以 ${volumeGainPercent}% 音量重新輸出影片，請稍候…`;
-        addEditorDownload(await renderEditedClip(start, end, `音量${volumeGainPercent}`, volumeGainPercent));
-        editorStatus.textContent = `音量調整完成（${volumeGainPercent}%），可以下載。`;
+        editorStatus.textContent = '正在套用局部音量節點並重新輸出影片，請稍候…';
+        addEditorDownload(await renderEditedClip(start, end, '局部音量調整', true));
+        editorStatus.textContent = '局部音量調整完成，可以下載。';
       } catch (error) { editorStatus.textContent = error.message; }
       finally { exportVolumeBtn.disabled = false; }
     });
