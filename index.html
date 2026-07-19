@@ -849,6 +849,7 @@
     let activeVolumeNode = null;
     let editorSourceUrl = '';
     let editorSourceMimeType = 'video/webm';
+    let editorSourceBlob = null;
     let fastFfmpeg = null;
     let fastCoreUrls = null;
     let lastResumeTime = 0;
@@ -1995,7 +1996,7 @@
       const blob = new Blob(recordedChunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
 
-      prepareEditorVideo(url, recordedDurationSeconds, blob.type);
+      prepareEditorVideo(url, recordedDurationSeconds, blob.type, blob);
 
       const baseName = getRecordingBaseName();
       downloadLink.href = url;
@@ -2006,10 +2007,11 @@
       updateFilenamePreview();
     }
 
-    function prepareEditorVideo(url, fallbackDuration = 0, sourceMimeType = 'video/webm') {
+    function prepareEditorVideo(url, fallbackDuration = 0, sourceMimeType = 'video/webm', sourceBlob = null) {
       const loadGeneration = ++editorLoadGeneration;
       editorSourceUrl = url;
       editorSourceMimeType = sourceMimeType || 'video/webm';
+      editorSourceBlob = sourceBlob;
       const timelineContext = timelineCanvas.getContext('2d');
       timelineContext.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
       timelineBuildGeneration = -1;
@@ -2086,7 +2088,7 @@
       const file = editorVideoInput.files?.[0];
       if (!file) return;
       const url = URL.createObjectURL(file);
-      prepareEditorVideo(url, 0, file.type);
+      prepareEditorVideo(url, 0, file.type, file);
       downloadSection.classList.add('hidden');
       downloadSection.classList.remove('flex');
       downloadLink.href = url;
@@ -2473,10 +2475,18 @@
       const jobId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const inputName = `input_${jobId}.${extension}`;
       const outputName = `output_${jobId}.${extension}`;
+      const mountDir = `/source_${jobId}`;
+      let sourceMounted = false;
       try {
-        await ffmpeg.writeFile(inputName, await fetchBinary(editorSourceUrl));
+        const sourceBlob = editorSourceBlob || await (await fetch(editorSourceUrl)).blob();
+        await ffmpeg.createDir(mountDir);
+        await ffmpeg.mount(window.FFmpegWASM.FFFSType.WORKERFS, {
+          blobs: [{ name: inputName, data: sourceBlob }]
+        }, mountDir);
+        sourceMounted = true;
+        const mountedInput = `${mountDir}/${inputName}`;
         const args = [
-          '-ss', start.toFixed(3), '-i', inputName, '-t', (end - start).toFixed(3),
+          '-ss', start.toFixed(3), '-i', mountedInput, '-t', (end - start).toFixed(3),
           '-map', '0:v:0?', '-map', '0:a:0?', '-c:v', 'copy'
         ];
         if (useVolumeEnvelope) args.push('-af', buildFastVolumeFilter(start, end));
@@ -2486,7 +2496,8 @@
         const data = await ffmpeg.readFile(outputName);
         return { blob: new Blob([data.buffer], { type: isMp4 ? 'video/mp4' : 'video/webm' }), extension, label };
       } finally {
-        await ffmpeg.deleteFile(inputName).catch(() => {});
+        if (sourceMounted) await ffmpeg.unmount(mountDir).catch(() => {});
+        await ffmpeg.deleteDir(mountDir).catch(() => {});
         await ffmpeg.deleteFile(outputName).catch(() => {});
       }
     }
@@ -2498,6 +2509,10 @@
       } catch (error) {
         console.warn('快速輸出失敗：', error);
         const errorMessage = error instanceof Error ? error.message : String(error ?? '未知錯誤');
+        if (/memory access out of bounds|RuntimeError/i.test(errorMessage) && fastFfmpeg) {
+          fastFfmpeg.terminate();
+          fastFfmpeg = null;
+        }
         throw new Error(`快速處理無法執行：${errorMessage} 請改選「相容模式」後重試。`);
       }
     }
