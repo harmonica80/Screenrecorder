@@ -160,6 +160,9 @@
 
     #timelineTrack { position: relative; height: 72px; overflow: hidden; border-radius: 10px; background: #0f172a; cursor: pointer; }
     #timelineCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #waveformTrack { position: relative; height: 46px; margin-top: 4px; overflow: hidden; border-radius: 8px; background: #0f172a; }
+    #waveformCanvas { display: block; width: 100%; height: 100%; }
+    #waveformStatus { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px; pointer-events: none; }
     #timelineSelection { position: absolute; top: 0; bottom: 0; border-top: 3px solid #22c55e; border-bottom: 3px solid #22c55e; background: rgba(34,197,94,.08); z-index: 10; pointer-events: none; }
     .timeline-trim-mask { position: absolute; top: 0; bottom: 0; background: rgba(220,38,38,.58); z-index: 15; pointer-events: none; }
     #timelinePlayhead { position: absolute; top: 0; bottom: 0; width: 3px; background: #facc15; z-index: 25; cursor: ew-resize; touch-action: none; }
@@ -588,6 +591,10 @@
             <button id="timelineStartHandle" type="button" aria-label="拖曳裁切開始位置" class="timeline-trim-handle">‹</button>
             <button id="timelineEndHandle" type="button" aria-label="拖曳裁切結束位置" class="timeline-trim-handle">›</button>
           </div>
+          <div id="waveformTrack" aria-label="影片音訊波形">
+            <canvas id="waveformCanvas"></canvas>
+            <span id="waveformStatus">正在分析音訊…</span>
+          </div>
           <div id="timelineTicks" class="flex justify-between text-[10px] text-slate-400 px-1 mt-1"></div>
           <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右藍色把手調整裁切範圍</p>
         </div>
@@ -787,6 +794,8 @@
     const timelineEndHandle = document.getElementById('timelineEndHandle');
     const timelineTicks = document.getElementById('timelineTicks');
     const timelineEndLabel = document.getElementById('timelineEndLabel');
+    const waveformCanvas = document.getElementById('waveformCanvas');
+    const waveformStatus = document.getElementById('waveformStatus');
     const splitAtPlayheadBtn = document.getElementById('splitAtPlayheadBtn');
 
     const timerDisplay = document.getElementById('timer');
@@ -812,6 +821,7 @@
     let editorVideoDuration = 0;
     let editorLoadGeneration = 0;
     let timelineBuildGeneration = -1;
+    let waveformBuildGeneration = -1;
     let lastResumeTime = 0;
     let timerInterval = null;
     let isPaused = false;
@@ -1969,6 +1979,11 @@
       const timelineContext = timelineCanvas.getContext('2d');
       timelineContext.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
       timelineBuildGeneration = -1;
+      waveformCanvas.getContext('2d').clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+      waveformStatus.textContent = '正在分析音訊…';
+      waveformStatus.hidden = false;
+      waveformBuildGeneration = -1;
+      buildAudioWaveform(loadGeneration, url).catch(error => console.warn('音訊波形建立失敗：', error));
       playbackVideo.classList.remove('hidden');
       videoPlaceholder.classList.add('hidden');
       previewContainer.classList.add('hidden');
@@ -2153,6 +2168,68 @@
         video.addEventListener('seeked', resolve, { once: true });
         video.currentTime = time;
       });
+    }
+
+    async function buildAudioWaveform(loadGeneration, sourceUrl) {
+      if (loadGeneration !== editorLoadGeneration || waveformBuildGeneration === loadGeneration) return;
+      waveformBuildGeneration = loadGeneration;
+      let decodeContext;
+      try {
+        const response = await fetch(sourceUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        if (loadGeneration !== editorLoadGeneration) return;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        decodeContext = new AudioContextClass();
+        const audioBuffer = await decodeContext.decodeAudioData(arrayBuffer.slice(0));
+        if (loadGeneration !== editorLoadGeneration) return;
+
+        const cssWidth = Math.max(320, timelineTrack.clientWidth);
+        const cssHeight = 46;
+        const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+        waveformCanvas.width = Math.round(cssWidth * pixelRatio);
+        waveformCanvas.height = Math.round(cssHeight * pixelRatio);
+        const context = waveformCanvas.getContext('2d');
+        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        context.clearRect(0, 0, cssWidth, cssHeight);
+        context.fillStyle = '#0f172a';
+        context.fillRect(0, 0, cssWidth, cssHeight);
+        context.strokeStyle = 'rgba(148,163,184,.25)';
+        context.beginPath();
+        context.moveTo(0, cssHeight / 2);
+        context.lineTo(cssWidth, cssHeight / 2);
+        context.stroke();
+
+        const barWidth = 2;
+        const barGap = 1;
+        const barCount = Math.max(1, Math.floor(cssWidth / (barWidth + barGap)));
+        const samplesPerBar = Math.max(1, Math.floor(audioBuffer.length / barCount));
+        let highestLevel = 0;
+        context.fillStyle = '#38bdf8';
+        for (let bar = 0; bar < barCount; bar++) {
+          const start = bar * samplesPerBar;
+          const end = Math.min(audioBuffer.length, start + samplesPerBar);
+          const step = Math.max(1, Math.floor((end - start) / 256));
+          let peak = 0;
+          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+            const samples = audioBuffer.getChannelData(channel);
+            for (let sample = start; sample < end; sample += step) peak = Math.max(peak, Math.abs(samples[sample]));
+          }
+          highestLevel = Math.max(highestLevel, peak);
+          const visibleLevel = Math.sqrt(Math.min(1, peak));
+          const barHeight = Math.max(1, visibleLevel * (cssHeight - 6));
+          context.fillRect(bar * (barWidth + barGap), (cssHeight - barHeight) / 2, barWidth, barHeight);
+        }
+        waveformStatus.hidden = highestLevel > 0.002;
+        waveformStatus.textContent = highestLevel > 0.002 ? '' : '音軌中沒有明顯聲音';
+      } catch (error) {
+        if (loadGeneration !== editorLoadGeneration) return;
+        waveformStatus.hidden = false;
+        waveformStatus.textContent = '沒有音軌或瀏覽器無法分析此格式';
+        throw error;
+      } finally {
+        if (decodeContext && decodeContext.state !== 'closed') await decodeContext.close().catch(() => {});
+        if (waveformBuildGeneration === loadGeneration && loadGeneration !== editorLoadGeneration) waveformBuildGeneration = -1;
+      }
     }
 
     function seekPlayback(time) {
