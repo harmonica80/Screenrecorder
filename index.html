@@ -1004,7 +1004,7 @@
 
     function getWatermarkText() {
       return watermarkTypeSelect.value === 'datetime'
-        ? formatWatermarkDateTime(recordingStartedAt || new Date())
+        ? formatWatermarkDateTime(new Date())
         : watermarkText.value.trim();
     }
 
@@ -1079,7 +1079,7 @@
     });
     updateWatermarkPreview();
     setInterval(() => {
-      if (watermarkTypeSelect.value === 'datetime' && !recordingStartedAt) updateWatermarkPreview();
+      if (watermarkToggle.checked && watermarkTypeSelect.value === 'datetime') updateWatermarkPreview();
     }, 1000);
 
     function syncDeviceSelectStates() {
