@@ -561,7 +561,7 @@
           <i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 shrink-0"></i>
           <div class="min-w-0">
             <h3 class="text-lg font-bold text-slate-800">錄製已順利完成！</h3>
-            <p class="text-xs text-slate-500">影片檔已準備就緒。</p>
+            <p class="text-xs text-slate-500">影片檔已準備就緒；支援的瀏覽器會記住上次儲存位置。</p>
           </div>
         </div>
         <div class="flex gap-3 shrink-0">
@@ -844,6 +844,11 @@
     let micStream = null;
     let mixedStream = null;
     let audioContext = null;
+    let canvasVideoTrack = null;
+    let lastCompositeFrameAt = 0;
+    let forceNextCompositeFrame = false;
+    let recordingDownloadBlob = null;
+    const COMPOSITE_FRAME_INTERVAL = 1000 / 30;
 
     let totalRecordedTime = 0;
     let recordedDurationSeconds = 0;
@@ -1688,10 +1693,19 @@
     function drawCanvasLoop() {
       if (!isRecording) return;
 
+      const frameTime = performance.now();
+      if (!forceNextCompositeFrame && frameTime - lastCompositeFrameAt < COMPOSITE_FRAME_INTERVAL) {
+        animationFrameId = requestAnimationFrame(drawCanvasLoop);
+        return;
+      }
+      lastCompositeFrameAt = frameTime;
+      forceNextCompositeFrame = false;
+
       // 以螢幕畫面作為基準解析度
-      if (previewVideo.videoWidth > 0 && canvas.width !== previewVideo.videoWidth) {
-        canvas.width = previewVideo.videoWidth;
-        canvas.height = previewVideo.videoHeight;
+      // 錄影開始後固定畫布尺寸，避免來源或浮動攝影機尺寸變化時重新建立影像緩衝區而抖動。
+      if (!canvasVideoTrack && previewVideo.videoWidth > 0 && canvas.width !== previewVideo.videoWidth) {
+        canvas.width = Math.max(2, Math.floor(previewVideo.videoWidth / 2) * 2);
+        canvas.height = Math.max(2, Math.floor(previewVideo.videoHeight / 2) * 2);
       }
 
       if (canvas.width > 0 && canvas.height > 0) {
@@ -1788,6 +1802,7 @@
           }
         }
         drawWatermark();
+        if (canvasVideoTrack?.requestFrame) canvasVideoTrack.requestFrame();
       }
 
       animationFrameId = requestAnimationFrame(drawCanvasLoop);
@@ -1805,7 +1820,7 @@
         const displayMediaOptions = {
           video: {
             displaySurface: displaySurfaceMode.value,
-            frameRate: { ideal: 30, max: 60 },
+            frameRate: { ideal: 30, max: 30 },
             cursor: 'always'
           },
           audio: sysAudioToggle.checked
@@ -1869,11 +1884,15 @@
           }
         });
 
+        lastCompositeFrameAt = 0;
+        forceNextCompositeFrame = true;
         drawCanvasLoop(); // 啟動畫布渲染
 
         // 從畫布抓取影像軌 (30 FPS)
         const canvasStream = canvas.captureStream(30);
         const videoTrack = canvasStream.getVideoTracks()[0];
+        canvasVideoTrack = videoTrack;
+        if (canvasVideoTrack.requestFrame) canvasVideoTrack.requestFrame();
 
         // 合併影像與音訊軌
         const tracksToRecord = [videoTrack];
@@ -1944,6 +1963,7 @@
       if (audioContext && audioContext.state !== 'closed') audioContext.close();
       screenStream = cameraStream = micStream = mixedStream = null;
       audioContext = null;
+      canvasVideoTrack = null;
     }
 
     function cancelPendingOrActiveRecording() {
@@ -1969,12 +1989,16 @@
     function togglePause() {
       if (!mediaRecorder) return;
       if (mediaRecorder.state === 'recording') {
+        if (mediaRecorder.requestData) mediaRecorder.requestData();
         mediaRecorder.pause();
         isPaused = true;
         totalRecordedTime += (Date.now() - lastResumeTime);
         setUIState('paused');
       } else if (mediaRecorder.state === 'paused') {
+        forceNextCompositeFrame = true;
+        lastCompositeFrameAt = 0;
         mediaRecorder.resume();
+        if (canvasVideoTrack?.requestFrame) canvasVideoTrack.requestFrame();
         isPaused = false;
         lastResumeTime = Date.now();
         setUIState('recording');
@@ -2001,6 +2025,7 @@
 
       const blob = new Blob(recordedChunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
+      recordingDownloadBlob = blob;
 
       prepareEditorVideo(url, recordedDurationSeconds, blob.type, blob);
 
@@ -2012,6 +2037,52 @@
       recordingSequenceInput.value = currentSequence >= 99 ? 1 : currentSequence + 1;
       updateFilenamePreview();
     }
+
+    function getVideoFilePickerTypes(fileName, mimeType = '') {
+      const isMp4 = /\.mp4$/i.test(fileName) || /mp4/i.test(mimeType);
+      return [{
+        description: isMp4 ? 'MP4 影片' : 'WebM 影片',
+        accept: { [isMp4 ? 'video/mp4' : 'video/webm']: [isMp4 ? '.mp4' : '.webm'] }
+      }];
+    }
+
+    async function saveVideoWithRememberedLocation(blob, fileName) {
+      if (!window.showSaveFilePicker) return false;
+      try {
+        // 固定的 id 會讓 Chrome／Edge 將下一次選檔視窗開在上次使用的資料夾。
+        const handle = await window.showSaveFilePicker({
+          id: 'screen-recorder-video',
+          suggestedName: fileName,
+          types: getVideoFilePickerTypes(fileName, blob.type)
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch (error) {
+        if (error?.name === 'AbortError') return true;
+        console.warn('無法使用上次的影片儲存位置，改用瀏覽器下載：', error);
+        return false;
+      }
+    }
+
+    function triggerBrowserDownload(blob, fileName) {
+      const url = URL.createObjectURL(blob);
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = url;
+      fallbackLink.download = fileName;
+      fallbackLink.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    downloadLink.addEventListener('click', async event => {
+      if (!recordingDownloadBlob || !window.showSaveFilePicker) return;
+      event.preventDefault();
+      const fileName = downloadLink.download || `screen-recording.${recordingMimeType.includes('mp4') ? 'mp4' : 'webm'}`;
+      if (!await saveVideoWithRememberedLocation(recordingDownloadBlob, fileName)) {
+        triggerBrowserDownload(recordingDownloadBlob, fileName);
+      }
+    });
 
     function prepareEditorVideo(url, fallbackDuration = 0, sourceMimeType = 'video/webm', sourceBlob = null) {
       const loadGeneration = ++editorLoadGeneration;
@@ -2572,6 +2643,13 @@
       link.download = `${getRecordingBaseName()}_${result.label}.${result.extension}`;
       link.className = 'px-3 py-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs';
       link.textContent = `下載${result.label}`;
+      link.addEventListener('click', async event => {
+        if (!window.showSaveFilePicker) return;
+        event.preventDefault();
+        if (!await saveVideoWithRememberedLocation(result.blob, link.download)) {
+          triggerBrowserDownload(result.blob, link.download);
+        }
+      });
       splitDownloads.appendChild(link);
     }
 
