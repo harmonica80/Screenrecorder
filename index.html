@@ -2228,6 +2228,7 @@
       timelineStartHandle.style.left = `${start / duration * 100}%`;
       timelineEndHandle.style.left = `${end / duration * 100}%`;
       timelinePlayhead.style.left = `${Math.min(100, playbackVideo.currentTime / duration * 100)}%`;
+      splitTimeInput.value = formatEditorTime(Math.max(0, Math.min(duration, playbackVideo.currentTime)));
     }
 
     async function buildTimelineThumbnails(loadGeneration, sourceUrl) {
