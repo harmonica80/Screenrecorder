@@ -608,14 +608,14 @@
           <p class="text-[11px] text-slate-500 mt-1">點擊縮圖可定位；拖曳左右把手裁切。點擊聲波新增音量節點、拖曳調整，右鍵刪除節點。</p>
         </div>
         <div class="grid grid-cols-3 gap-3">
-          <label class="text-xs text-slate-600">開始時間（秒）
-            <input id="editStartInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+          <label class="text-xs text-slate-600">開始時間（分:秒）
+            <input id="editStartInput" type="text" value="0:00" placeholder="0:00" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
           </label>
-          <label class="text-xs text-slate-600">結束時間（秒）
-            <input id="editEndInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+          <label class="text-xs text-slate-600">結束時間（分:秒）
+            <input id="editEndInput" type="text" value="0:00" placeholder="0:00" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
           </label>
-          <label class="text-xs text-slate-600">分割時間（秒）
-            <input id="splitTimeInput" type="number" min="0" step="0.1" value="0" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+          <label class="text-xs text-slate-600">分割時間（分:秒）
+            <input id="splitTimeInput" type="text" value="0:00" placeholder="0:00" class="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
           </label>
         </div>
         <div class="mt-3 flex flex-wrap gap-2">
@@ -2115,9 +2115,9 @@
         if (!editorVideoDuration) return;
         editorInitialized = true;
         editorDuration.textContent = `片長：${editorVideoDuration.toFixed(1)} 秒`;
-        editStartInput.value = '0';
-        editEndInput.value = editorVideoDuration.toFixed(1);
-        splitTimeInput.value = (editorVideoDuration / 2).toFixed(1);
+        editStartInput.value = formatEditorTime(0);
+        editEndInput.value = formatEditorTime(editorVideoDuration);
+        splitTimeInput.value = formatEditorTime(editorVideoDuration / 2);
         timelineEndLabel.textContent = formatTimelineTime(editorVideoDuration);
         timelineTicks.innerHTML = Array.from({ length: 6 }, (_, index) => `<span>${formatTimelineTime(editorVideoDuration * index / 5)}</span>`).join('');
         editorStatus.textContent = '時間軸已準備完成，可以點擊或拖曳編輯。';
@@ -2145,7 +2145,7 @@
         durationRecovered = true;
         editorVideoDuration = playbackVideo.duration;
         editorDuration.textContent = `片長：${editorVideoDuration.toFixed(1)} 秒`;
-        editEndInput.value = editorVideoDuration.toFixed(1);
+        editEndInput.value = formatEditorTime(editorVideoDuration);
         timelineEndLabel.textContent = formatTimelineTime(editorVideoDuration);
         timelineTicks.innerHTML = Array.from({ length: 6 }, (_, index) => `<span>${formatTimelineTime(editorVideoDuration * index / 5)}</span>`).join('');
         updateTimelineSelection();
@@ -2175,9 +2175,10 @@
 
     function getEditRange() {
       const duration = editorVideoDuration;
-      let start = Number(editStartInput.value);
-      let end = Number(editEndInput.value);
+      let start = parseEditorTime(editStartInput.value);
+      let end = parseEditorTime(editEndInput.value);
       if (!Number.isFinite(duration) || duration <= 0) throw new Error('影片尚未準備完成。');
+      if (!Number.isFinite(start) || !Number.isFinite(end)) throw new Error('時間格式請輸入「分:秒」，例如 1:30。');
       start = Math.max(0, Math.min(duration, start));
       end = Math.max(0, Math.min(duration, end));
       if (end <= start + 0.05) throw new Error('結束時間必須大於開始時間。');
@@ -2189,11 +2190,35 @@
       return `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, '0')}`;
     }
 
+    function formatEditorTime(seconds) {
+      const value = Math.max(0, Number(seconds) || 0);
+      const rounded = Math.round(value * 10) / 10;
+      const minutes = Math.floor(rounded / 60);
+      const remainingSeconds = rounded - minutes * 60;
+      const secondsText = Number.isInteger(remainingSeconds) ? String(remainingSeconds) : remainingSeconds.toFixed(1);
+      const paddedSeconds = secondsText.padStart(secondsText.includes('.') ? 4 : 2, '0');
+      return `${minutes}:${paddedSeconds}`;
+    }
+
+    function parseEditorTime(value) {
+      const text = String(value ?? '').trim();
+      if (!text) return NaN;
+      if (!text.includes(':')) return Number(text);
+      const parts = text.split(':');
+      if (parts.length !== 2) return NaN;
+      const minutes = Number(parts[0]);
+      const seconds = Number(parts[1]);
+      if (!Number.isInteger(minutes) || minutes < 0 || !Number.isFinite(seconds) || seconds < 0 || seconds >= 60) return NaN;
+      return minutes * 60 + seconds;
+    }
+
     function updateTimelineSelection() {
       const duration = editorVideoDuration;
       if (!duration) return;
-      const start = Math.max(0, Math.min(duration, Number(editStartInput.value) || 0));
-      const end = Math.max(start, Math.min(duration, Number(editEndInput.value) || duration));
+      const parsedStart = parseEditorTime(editStartInput.value);
+      const parsedEnd = parseEditorTime(editEndInput.value);
+      const start = Math.max(0, Math.min(duration, Number.isFinite(parsedStart) ? parsedStart : 0));
+      const end = Math.max(start, Math.min(duration, Number.isFinite(parsedEnd) ? parsedEnd : duration));
       timelineSelection.style.left = `${start / duration * 100}%`;
       timelineSelection.style.width = `${Math.max(0, (end - start) / duration * 100)}%`;
       timelineLeftTrim.style.left = '0';
@@ -2663,6 +2688,10 @@
       } catch (error) { editorStatus.textContent = error.message; }
     });
     [editStartInput, editEndInput].forEach(input => input.addEventListener('input', updateTimelineSelection));
+    [editStartInput, editEndInput, splitTimeInput].forEach(input => input.addEventListener('blur', () => {
+      const seconds = parseEditorTime(input.value);
+      if (Number.isFinite(seconds)) input.value = formatEditorTime(seconds);
+    }));
     function setupTimelineHandle(handle, edge) {
       handle.addEventListener('click', event => event.stopPropagation());
       handle.addEventListener('pointerdown', event => {
@@ -2674,8 +2703,8 @@
         if (!handle.hasPointerCapture(event.pointerId) || !editorVideoDuration) return;
         const rect = timelineTrack.getBoundingClientRect();
         const time = Math.max(0, Math.min(editorVideoDuration, (event.clientX - rect.left) / rect.width * editorVideoDuration));
-        if (edge === 'start') editStartInput.value = Math.min(time, Number(editEndInput.value) - 0.1).toFixed(1);
-        else editEndInput.value = Math.max(time, Number(editStartInput.value) + 0.1).toFixed(1);
+        if (edge === 'start') editStartInput.value = formatEditorTime(Math.min(time, parseEditorTime(editEndInput.value) - 0.1));
+        else editEndInput.value = formatEditorTime(Math.max(time, parseEditorTime(editStartInput.value) + 0.1));
         updateTimelineSelection();
       });
     }
@@ -2690,7 +2719,7 @@
       if (!timelinePlayhead.hasPointerCapture(event.pointerId) || !editorVideoDuration) return;
       const rect = timelineTrack.getBoundingClientRect();
       playbackVideo.currentTime = Math.max(0, Math.min(editorVideoDuration, (event.clientX - rect.left) / rect.width * editorVideoDuration));
-      splitTimeInput.value = playbackVideo.currentTime.toFixed(1);
+      splitTimeInput.value = formatEditorTime(playbackVideo.currentTime);
       updateTimelineSelection();
     });
     timelinePlayhead.addEventListener('click', event => event.stopPropagation());
@@ -2703,7 +2732,7 @@
     playbackVideo.addEventListener('timeupdate', updateTimelineSelection);
     splitAtPlayheadBtn.addEventListener('click', () => {
       if (!editorVideoDuration) return;
-      splitTimeInput.value = Math.max(0.1, Math.min(editorVideoDuration - 0.1, playbackVideo.currentTime)).toFixed(1);
+      splitTimeInput.value = formatEditorTime(Math.max(0.1, Math.min(editorVideoDuration - 0.1, playbackVideo.currentTime)));
       splitVideoBtn.click();
     });
     exportTrimBtn.addEventListener('click', async () => {
@@ -2718,7 +2747,7 @@
     });
     splitVideoBtn.addEventListener('click', async () => {
       try {
-        const split = Number(splitTimeInput.value);
+        const split = parseEditorTime(splitTimeInput.value);
         const duration = editorVideoDuration;
         if (!Number.isFinite(split) || split <= 0 || split >= duration) throw new Error('分割時間必須位於影片中間。');
         splitVideoBtn.disabled = true;
