@@ -2730,7 +2730,28 @@
       playbackVideo.currentTime = ((event.clientX - rect.left) / rect.width) * editorVideoDuration;
       updateTimelineSelection();
     });
+    let playbackSyncFrame = 0;
+    function syncPlaybackPosition() {
+      updateTimelineSelection();
+      if (!playbackVideo.paused && !playbackVideo.ended) {
+        playbackSyncFrame = requestAnimationFrame(syncPlaybackPosition);
+      }
+    }
+    function startPlaybackPositionSync() {
+      cancelAnimationFrame(playbackSyncFrame);
+      syncPlaybackPosition();
+    }
+    function stopPlaybackPositionSync() {
+      cancelAnimationFrame(playbackSyncFrame);
+      playbackSyncFrame = 0;
+      updateTimelineSelection();
+    }
     playbackVideo.addEventListener('timeupdate', updateTimelineSelection);
+    playbackVideo.addEventListener('seeking', updateTimelineSelection);
+    playbackVideo.addEventListener('seeked', updateTimelineSelection);
+    playbackVideo.addEventListener('play', startPlaybackPositionSync);
+    playbackVideo.addEventListener('pause', stopPlaybackPositionSync);
+    playbackVideo.addEventListener('ended', stopPlaybackPositionSync);
     splitAtPlayheadBtn.addEventListener('click', () => {
       if (!editorVideoDuration) return;
       splitTimeInput.value = formatEditorTime(Math.max(0.1, Math.min(editorVideoDuration - 0.1, playbackVideo.currentTime)));
