@@ -75,6 +75,65 @@
     #webcamContainer.border-blue { border-color: #3b82f6; }
     #webcamContainer.border-amber { border-color: #f59e0b; }
 
+    #cameraPositionPresets {
+      display: none;
+      width: fit-content;
+      max-width: 100%;
+      margin: 10px auto 0;
+      padding: 5px;
+      gap: 5px;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+    }
+
+    #cameraPositionPresets.is-visible { display: flex; }
+
+    .camera-position-btn {
+      position: relative;
+      width: 52px;
+      height: 42px;
+      flex: 0 0 auto;
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      background-color: #fff;
+      background-image:
+        linear-gradient(to right, transparent 32.5%, #94a3b8 33%, #94a3b8 34%, transparent 34.5%, transparent 65.5%, #94a3b8 66%, #94a3b8 67%, transparent 67.5%),
+        linear-gradient(to bottom, transparent 32.5%, #94a3b8 33%, #94a3b8 34%, transparent 34.5%, transparent 65.5%, #94a3b8 66%, #94a3b8 67%, transparent 67.5%);
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s, transform .15s;
+    }
+
+    .camera-position-btn::after {
+      content: '';
+      position: absolute;
+      width: 15px;
+      height: 11px;
+      border: 1px solid #3b82f6;
+      border-radius: 2px;
+      background: #60a5fa;
+    }
+
+    .camera-position-btn[data-position='bottom-left']::after { left: 3px; bottom: 3px; }
+    .camera-position-btn[data-position='bottom-center']::after { left: 50%; bottom: 3px; transform: translateX(-50%); }
+    .camera-position-btn[data-position='bottom-right']::after { right: 3px; bottom: 3px; }
+    .camera-position-btn[data-position='middle-left']::after { left: 3px; top: 50%; transform: translateY(-50%); }
+    .camera-position-btn[data-position='middle-right']::after { right: 3px; top: 50%; transform: translateY(-50%); }
+    .camera-position-btn[data-position='center']::after {
+      width: 22px; height: 22px; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    }
+
+    .camera-position-btn:hover,
+    .camera-position-btn:focus-visible,
+    .camera-position-btn.is-active {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
+      outline: none;
+    }
+
+    .camera-position-btn:active { transform: scale(.96); }
+
     #webcamVideo, #webcamEffectCanvas {
       width: 100%;
       height: 100%;
@@ -687,6 +746,15 @@
         </div>
       </div>
 
+      <div id="cameraPositionPresets" role="group" aria-label="攝影機快速擺放位置">
+        <button type="button" class="camera-position-btn" data-position="bottom-left" title="左下" aria-label="攝影機移到左下"></button>
+        <button type="button" class="camera-position-btn" data-position="bottom-center" title="下方置中" aria-label="攝影機移到下方置中"></button>
+        <button type="button" class="camera-position-btn is-active" data-position="bottom-right" title="右下" aria-label="攝影機移到右下" aria-pressed="true"></button>
+        <button type="button" class="camera-position-btn" data-position="middle-left" title="左側置中" aria-label="攝影機移到左側置中"></button>
+        <button type="button" class="camera-position-btn" data-position="middle-right" title="右側置中" aria-label="攝影機移到右側置中"></button>
+        <button type="button" class="camera-position-btn" data-position="center" title="畫面中央" aria-label="攝影機移到畫面中央"></button>
+      </div>
+
       <!-- 隱藏畫布 (用於混合螢幕與攝影機軌道) -->
       <canvas id="compositingCanvas" width="1920" height="1080"></canvas>
     </section>
@@ -784,6 +852,8 @@
     const webcamEffectCanvas = document.getElementById('webcamEffectCanvas');
     const webcamEffectCtx = webcamEffectCanvas.getContext('2d');
     const webcamNameplate = document.getElementById('webcamNameplate');
+    const cameraPositionPresets = document.getElementById('cameraPositionPresets');
+    const cameraPositionButtons = [...document.querySelectorAll('.camera-position-btn')];
     const watermarkPreview = document.getElementById('watermarkPreview');
     const playbackVideo = document.getElementById('playbackVideo');
     const videoPlaceholder = document.getElementById('videoPlaceholder');
@@ -868,6 +938,7 @@
     let isPaused = false;
     let isRecording = false;
     let animationFrameId = null;
+    let backgroundCompositeTimer = null;
     let isPreparing = false;
     let countdownCancelled = false;
     let recordingStartedAt = null;
@@ -1149,6 +1220,7 @@
       }
       cameraPanelToggle.disabled = !cameraToggle.checked;
       cameraPanelToggle.classList.toggle('opacity-50', !cameraToggle.checked);
+      cameraPositionPresets.classList.toggle('is-visible', cameraToggle.checked);
     }
 
     micToggle.addEventListener('change', syncDeviceSelectStates);
@@ -1168,6 +1240,10 @@
       webcamContainer.style.borderStyle = borderWidth ? 'solid' : 'none';
       webcamContainer.style.borderColor = borderColors[cameraBorderSelect.value];
       webcamContainer.style.boxShadow = 'none';
+      const selectedPosition = cameraPositionButtons.find(button => button.classList.contains('is-active'))?.dataset.position;
+      if (selectedPosition && webcamContainer.style.display !== 'none') {
+        requestAnimationFrame(() => setCameraPosition(selectedPosition, false));
+      }
     }
 
     [cameraSizeSelect, cameraShapeSelect, cameraBorderSelect, cameraBorderWidthSelect].forEach(control => {
@@ -1479,12 +1555,14 @@
         isCameraVisible = true;
         cameraVisibilityBtn.textContent = '隱藏畫面';
         if (resetPosition) {
-          webcamContainer.style.bottom = '20px';
-          webcamContainer.style.right = '20px';
-          webcamContainer.style.left = 'auto';
-          webcamContainer.style.top = 'auto';
+          cameraPositionButtons.forEach(button => {
+            const active = button.dataset.position === 'bottom-right';
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
+          });
         }
         applyCameraAppearance();
+        if (resetPosition) requestAnimationFrame(() => setCameraPosition('bottom-right'));
         applyBackgroundEffect();
         await refreshMediaDevices();
         return true;
@@ -1530,6 +1608,10 @@
 
     function dragStart(e) {
       if (!cameraToggle.checked || e.target !== webcamContainer) return;
+      cameraPositionButtons.forEach(button => {
+        button.classList.remove('is-active');
+        button.setAttribute('aria-pressed', 'false');
+      });
       isDragging = true;
       const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
       const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
@@ -1577,6 +1659,41 @@
     function dragEnd() {
       isDragging = false;
     }
+
+    function setCameraPosition(position, updateSelection = true) {
+      const containerWidth = previewContainer.clientWidth;
+      const containerHeight = previewContainer.clientHeight;
+      const cameraWidth = webcamContainer.offsetWidth;
+      const cameraHeight = webcamContainer.offsetHeight;
+      if (!containerWidth || !containerHeight || !cameraWidth || !cameraHeight) return;
+
+      const margin = Math.max(10, Math.min(20, containerWidth * 0.025));
+      const positions = {
+        'bottom-left': [margin, containerHeight - cameraHeight - margin],
+        'bottom-center': [(containerWidth - cameraWidth) / 2, containerHeight - cameraHeight - margin],
+        'bottom-right': [containerWidth - cameraWidth - margin, containerHeight - cameraHeight - margin],
+        'middle-left': [margin, (containerHeight - cameraHeight) / 2],
+        'middle-right': [containerWidth - cameraWidth - margin, (containerHeight - cameraHeight) / 2],
+        center: [(containerWidth - cameraWidth) / 2, (containerHeight - cameraHeight) / 2]
+      };
+      const [left, top] = positions[position] || positions['bottom-right'];
+      webcamContainer.style.bottom = 'auto';
+      webcamContainer.style.right = 'auto';
+      webcamContainer.style.left = `${Math.max(0, left)}px`;
+      webcamContainer.style.top = `${Math.max(0, top)}px`;
+
+      if (updateSelection) {
+        cameraPositionButtons.forEach(button => {
+          const active = button.dataset.position === position;
+          button.classList.toggle('is-active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+    }
+
+    cameraPositionButtons.forEach(button => {
+      button.addEventListener('click', () => setCameraPosition(button.dataset.position));
+    });
 
     // ------------------------------------------------------------
     // UI 狀態管理
@@ -1689,13 +1806,11 @@
     // 核心錄影與畫布合成邏輯
     // ------------------------------------------------------------
 
-    // 畫布渲染循環 (將螢幕和攝影機畫在一起)
-    function drawCanvasLoop() {
+    function drawCompositeFrame() {
       if (!isRecording) return;
 
       const frameTime = performance.now();
       if (!forceNextCompositeFrame && frameTime - lastCompositeFrameAt < COMPOSITE_FRAME_INTERVAL) {
-        animationFrameId = requestAnimationFrame(drawCanvasLoop);
         return;
       }
       lastCompositeFrameAt = frameTime;
@@ -1804,9 +1919,46 @@
         drawWatermark();
         if (canvasVideoTrack?.requestFrame) canvasVideoTrack.requestFrame();
       }
+    }
+
+    // 前景分頁使用 requestAnimationFrame；背景分頁改用計時器，避免瀏覽器
+    // 暫停 requestAnimationFrame 後，Canvas 合成影像停在最後一格。
+    function drawCanvasLoop() {
+      if (!isRecording || document.hidden) return;
+      drawCompositeFrame();
 
       animationFrameId = requestAnimationFrame(drawCanvasLoop);
     }
+
+    function stopCompositeScheduler() {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      if (backgroundCompositeTimer !== null) {
+        clearInterval(backgroundCompositeTimer);
+        backgroundCompositeTimer = null;
+      }
+    }
+
+    function startCompositeScheduler() {
+      stopCompositeScheduler();
+      if (!isRecording) return;
+
+      forceNextCompositeFrame = true;
+      lastCompositeFrameAt = 0;
+      drawCompositeFrame();
+
+      if (document.hidden) {
+        backgroundCompositeTimer = setInterval(drawCompositeFrame, COMPOSITE_FRAME_INTERVAL);
+      } else {
+        animationFrameId = requestAnimationFrame(drawCanvasLoop);
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (isRecording) startCompositeScheduler();
+    });
 
     // 啟動錄製流程
     async function startRecording() {
@@ -1886,7 +2038,7 @@
 
         lastCompositeFrameAt = 0;
         forceNextCompositeFrame = true;
-        drawCanvasLoop(); // 啟動畫布渲染
+        startCompositeScheduler(); // 啟動畫布渲染
 
         // 從畫布抓取影像軌 (30 FPS)
         const canvasStream = canvas.captureStream(30);
@@ -1939,6 +2091,7 @@
         console.error("啟動錄影失敗: ", err);
         isRecording = false;
         isPreparing = false;
+        stopCompositeScheduler();
 
         // 避免將瀏覽器的原生權限錯誤訊息直接用 alert() 強制彈出干擾使用者
         const errMsg = err.message || '';
@@ -1971,7 +2124,7 @@
         countdownCancelled = true;
         isPreparing = false;
         isRecording = false;
-        cancelAnimationFrame(animationFrameId);
+        stopCompositeScheduler();
         countdownOverlay.classList.add('hidden');
         countdownOverlay.classList.remove('flex');
         stopMediaTracks();
@@ -2009,7 +2162,7 @@
       if (!isPaused && lastResumeTime) totalRecordedTime += Date.now() - lastResumeTime;
       recordedDurationSeconds = Math.max(0.1, totalRecordedTime / 1000);
       isRecording = false;
-      cancelAnimationFrame(animationFrameId);
+      stopCompositeScheduler();
       clearInterval(timerInterval);
 
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
