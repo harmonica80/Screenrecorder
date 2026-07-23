@@ -1228,8 +1228,25 @@
     syncDeviceSelectStates();
 
     const cameraSizeMap = { small: 150, medium: 200, large: 280 };
+
+    function applyCameraPresetSize(position) {
+      if (position !== 'center') {
+        webcamContainer.style.width = `${cameraSizeMap[cameraSizeSelect.value]}px`;
+        return;
+      }
+
+      // 中央大型模式依預覽畫面比例縮放：橫式攝影機約為紅框寬度，
+      // 圓形攝影機則以紅框高度為直徑，避免超出預覽畫面。
+      const maxWidth = previewContainer.clientWidth * 0.48;
+      const maxHeight = previewContainer.clientHeight * 0.65;
+      const isEqualSides = cameraShapeSelect.value === 'circle';
+      const targetWidth = isEqualSides ? Math.min(maxWidth, maxHeight) : maxWidth;
+      webcamContainer.style.width = `${Math.max(cameraSizeMap.large, Math.round(targetWidth))}px`;
+    }
+
     function applyCameraAppearance() {
-      webcamContainer.style.width = `${cameraSizeMap[cameraSizeSelect.value]}px`;
+      const selectedPosition = cameraPositionButtons.find(button => button.classList.contains('is-active'))?.dataset.position;
+      applyCameraPresetSize(selectedPosition);
       webcamContainer.classList.remove('shape-circle', 'shape-square', 'border-none', 'border-blue', 'border-amber');
       if (cameraShapeSelect.value === 'circle') webcamContainer.classList.add('shape-circle');
       if (cameraShapeSelect.value === 'square') webcamContainer.classList.add('shape-square');
@@ -1240,7 +1257,6 @@
       webcamContainer.style.borderStyle = borderWidth ? 'solid' : 'none';
       webcamContainer.style.borderColor = borderColors[cameraBorderSelect.value];
       webcamContainer.style.boxShadow = 'none';
-      const selectedPosition = cameraPositionButtons.find(button => button.classList.contains('is-active'))?.dataset.position;
       if (selectedPosition && webcamContainer.style.display !== 'none') {
         requestAnimationFrame(() => setCameraPosition(selectedPosition, false));
       }
@@ -1608,10 +1624,14 @@
 
     function dragStart(e) {
       if (!cameraToggle.checked || e.target !== webcamContainer) return;
+      const wasCenterPreset = cameraPositionButtons.some(button =>
+        button.dataset.position === 'center' && button.classList.contains('is-active')
+      );
       cameraPositionButtons.forEach(button => {
         button.classList.remove('is-active');
         button.setAttribute('aria-pressed', 'false');
       });
+      if (wasCenterPreset) applyCameraPresetSize();
       isDragging = true;
       const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
       const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
@@ -1661,6 +1681,7 @@
     }
 
     function setCameraPosition(position, updateSelection = true) {
+      applyCameraPresetSize(position);
       const containerWidth = previewContainer.clientWidth;
       const containerHeight = previewContainer.clientHeight;
       const cameraWidth = webcamContainer.offsetWidth;
