@@ -2249,13 +2249,18 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
-    downloadLink.addEventListener('click', async event => {
-      if (!recordingDownloadBlob || !window.showSaveFilePicker) return;
-      event.preventDefault();
+    async function downloadCurrentRecording() {
+      if (!recordingDownloadBlob) return;
       const fileName = downloadLink.download || `screen-recording.${recordingMimeType.includes('mp4') ? 'mp4' : 'webm'}`;
       if (!await saveVideoWithRememberedLocation(recordingDownloadBlob, fileName)) {
         triggerBrowserDownload(recordingDownloadBlob, fileName);
       }
+    }
+
+    downloadLink.addEventListener('click', async event => {
+      if (!recordingDownloadBlob || !window.showSaveFilePicker) return;
+      event.preventDefault();
+      await downloadCurrentRecording();
     });
 
     function prepareEditorVideo(url, fallbackDuration = 0, sourceMimeType = 'video/webm', sourceBlob = null) {
@@ -2966,25 +2971,40 @@
       finally { exportVolumeBtn.disabled = false; }
     });
 
+    function clearFinishedRecording() {
+      recordingStartedAt = null;
+      updateWatermarkPreview();
+      playbackVideo.pause();
+      playbackVideo.removeAttribute('src');
+      playbackVideo.load();
+      if (downloadLink.href) {
+        URL.revokeObjectURL(downloadLink.href);
+        downloadLink.removeAttribute('href');
+      }
+      recordingDownloadBlob = null;
+      recordedChunks = [];
+      videoArea.classList.remove('border-emerald-400');
+      editorPanel.classList.add('hidden');
+      splitDownloads.innerHTML = '';
+    }
+
+    async function beginNextRecording() {
+      if (recordingDownloadBlob) {
+        const shouldDownload = confirm(
+          '目前已有錄製完成的影片。\n\n按「確定」：先下載目前影片，再開始新的錄影。\n按「取消」：不下載目前影片，直接開始新的錄影。'
+        );
+        if (shouldDownload) await downloadCurrentRecording();
+        clearFinishedRecording();
+      }
+      await startRecording();
+    }
+
     // 事件綁定
-    startBtn.addEventListener('click', startRecording);
+    startBtn.addEventListener('click', beginNextRecording);
     cancelCountdownBtn.addEventListener('click', cancelPendingOrActiveRecording);
     pauseBtn.addEventListener('click', togglePause);
     stopBtn.addEventListener('click', stopRecording);
-    newRecordBtn.addEventListener('click', () => {
-      recordingStartedAt = null;
-      updateWatermarkPreview();
-      playbackVideo.src = "";
-      if (downloadLink.href) {
-        URL.revokeObjectURL(downloadLink.href);
-      }
-      videoArea.classList.remove('border-emerald-400');
-      setUIState('ready');
-      videoPlaceholder.classList.remove('hidden');
-      playbackVideo.classList.add('hidden');
-      editorPanel.classList.add('hidden');
-      splitDownloads.innerHTML = '';
-    });
+    newRecordBtn.addEventListener('click', beginNextRecording);
 
     // 檢查瀏覽器是否支援 WebRTC 螢幕錄影 (getDisplayMedia)
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
