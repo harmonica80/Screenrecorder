@@ -242,6 +242,19 @@ function createWindow() {
   });
 
   mainWindow.removeMenu();
+  const openExternalLink = url => {
+    try {
+      const parsed = new URL(url);
+      if (['https:', 'http:'].includes(parsed.protocol)) shell.openExternal(parsed.href).catch(console.error);
+    } catch (_) {}
+  };
+  mainWindow.webContents.setWindowOpenHandler(({url}) => {
+    openExternalLink(url);
+    return {action:'deny'};
+  });
+  mainWindow.webContents.on('will-navigate', (event,url) => {
+    if (new URL(url).origin !== localAppOrigin) { event.preventDefault(); openExternalLink(url); }
+  });
   mainWindow.webContents.on('render-process-gone', () => { recordingIndicator.dispose(); shortcuts.clear(); });
   mainWindow.loadURL(`${localAppOrigin}/index.html`);
   mainWindow.on('closed', () => { recordingIndicator.dispose(); shortcuts.clear(); mainWindow = null; });

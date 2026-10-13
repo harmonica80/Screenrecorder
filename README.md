@@ -15,17 +15,17 @@
 
 線上版的格式、音訊來源與儲存能力依瀏覽器而異，快捷鍵需網頁取得焦點。需要全域快捷鍵或桌面版持續寫入磁碟功能，可下載輕量版；需要原生 MP4／MKV／WebM 處理，可使用進階版。
 
-## 下載 Windows 進階測試版 v0.2.0-beta.3
+## 下載 Windows 進階測試版 v0.2.0-beta.4
 
-[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.3-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.3/Screenrecorder-Pro-Advanced-0.2.0-beta.3-Portable.exe)
+[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.4-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.4/Screenrecorder-Pro-Advanced-0.2.0-beta.4-Portable.exe)
 
 內建原生 FFmpeg，支援即時 MP4／MKV／WebM 錄影、錄完轉檔、裁切、分割與音量調整。beta.3 更新應用程式圖示、頁尾版本介紹與 GitHub 連結，外部連結以系統預設瀏覽器開啟。
 
 MP4 即時錄影會增加 CPU 負擔。剪輯速度取決於編碼、畫質與電腦效能；目前精準裁切與音量調整仍需重新編碼，使用 MP4／MKV 不保證每次都能大幅加速，MKV 無損封裝則可避免重新編碼。
 
-## 下載 Windows 輕量版 v0.1.6
+## 下載 Windows 輕量版 v0.1.7
 
-[下載 Screenrecorder-Pro-Lite-0.1.6-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/v0.1.6/Screenrecorder-Pro-Lite-0.1.6-Portable.exe)
+[下載 Screenrecorder-Pro-Lite-0.1.7-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/v0.1.7/Screenrecorder-Pro-Lite-0.1.7-Portable.exe)
 
 [所有版本與更新說明](https://github.com/harmonica80/Screenrecorder/releases)
 

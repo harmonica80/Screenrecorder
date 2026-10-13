@@ -1,5 +1,5 @@
 name: Publish Windows Lite
-# v0.1.6: dedicated Lite application icon
+# v0.1.7: compact footer
 on:
   push:
     branches: [main]
