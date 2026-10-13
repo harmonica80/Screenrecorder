@@ -1016,7 +1016,7 @@
         status.textContent = '正在檢查新版本…';
         try {
           const result = await desktopRecorder.checkForUpdates();
-          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? '尚無公開發布的輕量版版本，暫時無法比對更新。' : `目前 v${result.currentVersion} 已是最新可用版本。`;
+          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? `尚無公開發布的${isAdvanced ? '進階版' : '輕量版'}版本，暫時無法比對更新。` : `目前 v${result.currentVersion} 已是最新可用版本。`;
           downloadButton.hidden = result.status !== 'available';
         } catch (error) { status.textContent = '檢查更新失敗，請確認網路後重試。' + error.message; }
         finally { button.disabled = false; }
