@@ -2,6 +2,7 @@ const { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, na
 const { createShortcuts } = require('./shortcuts');
 const advancedEdition = require('../package.json').edition === 'advanced';
 const { createNativeMedia } = require('./native-media');
+const { createLiveRecording } = require('./live-recording');
 const nativeMedia = advancedEdition ? createNativeMedia(pathForNativeBinary()) : null;
 function pathForNativeBinary() {
   const p = require('node:path');
@@ -96,17 +97,17 @@ function startLocalAppServer() {
   });
 }
 
-function safeSuggestedName(value) {
+function safeSuggestedName(value, format = 'webm') {
   const name = path.basename(String(value || 'screen-recording.webm'))
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_');
-  return name.toLowerCase().endsWith('.webm') ? name : `${name}.webm`;
+  return name.toLowerCase().endsWith(`.${format}`) ? name : `${name}.${format}`;
 }
 
 async function closeActiveRecording({ remove = false } = {}) {
   if (!activeRecording) return;
-  const { handle, filePath } = activeRecording;
+  const { handle, filePath, live } = activeRecording;
   activeRecording = null;
-  try { await handle.close(); } catch (_) {}
+  try { if (live) { if (remove) await live.cancel(); else await live.finalize(); } else await handle.close(); } catch (_) {}
   if (remove) {
     try { await fs.unlink(filePath); } catch (_) {}
   }
@@ -196,37 +197,44 @@ function registerRecordingHandlers() {
     return Boolean(selectedCapture.id);
   });
 
-  ipcMain.handle('recording:prepare', async (_event, suggestedName) => {
+  ipcMain.handle('recording:prepare', async (_event, request) => {
     if (nativeMedia?.busy) throw new Error('影片處理中，請完成後再錄影。');
     if (activeRecording) throw new Error('上一段影片仍在儲存，請稍候。');
+    const options = typeof request === 'string' ? { suggestedName:request } : request || {};
+    const format = advancedEdition ? (options.format || 'webm') : 'webm';
+    if (!['mp4','mkv','webm'].includes(format)) throw new Error('錄影格式無效。');
+    if (format !== 'webm') await fs.access(pathForNativeBinary());
+    const name = safeSuggestedName(options.suggestedName, format);
+    let created;
     if (saveSettings.recordingDirectory) {
-      try {
-        const created = await createUniqueRecording(saveSettings.recordingDirectory, safeSuggestedName(suggestedName));
-        activeRecording = { ...created, bytesWritten: 0 };
-        return { canceled: false, filePath: created.filePath };
-      } catch (error) {
-        throw new Error('預設儲存資料夾無法寫入，請在錄影進階設定重新選擇資料夾：' + error.message);
-      }
+      try { created = await createUniqueRecording(saveSettings.recordingDirectory, name, format); }
+      catch (error) { throw new Error('預設儲存資料夾無法寫入，請重新選擇資料夾：' + error.message); }
+    } else {
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title:'選擇錄影檔儲存位置', defaultPath:path.join(app.getPath('videos'),name),
+        filters:[{name:`${format.toUpperCase()} 影片`,extensions:[format]}],
+        properties:['createDirectory','showOverwriteConfirmation']
+      });
+      if (result.canceled || !result.filePath) return {canceled:true};
+      const filePath = result.filePath.toLowerCase().endsWith(`.${format}`) ? result.filePath : `${result.filePath}.${format}`;
+      created = {filePath,handle:await fs.open(filePath,'w')};
     }
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: '選擇錄影檔儲存位置',
-      defaultPath: path.join(app.getPath('videos'), safeSuggestedName(suggestedName)),
-      filters: [{ name: 'WebM 影片', extensions: ['webm'] }],
-      properties: ['createDirectory', 'showOverwriteConfirmation']
-    });
-    if (result.canceled || !result.filePath) return { canceled: true };
-
-    const filePath = result.filePath.toLowerCase().endsWith('.webm')
-      ? result.filePath
-      : `${result.filePath}.webm`;
-    const handle = await fs.open(filePath, 'w');
-    activeRecording = { filePath, handle, bytesWritten: 0 };
-    return { canceled: false, filePath };
+    activeRecording = {...created,bytesWritten:0,format};
+    if (format !== 'webm') {
+      await created.handle.close();
+      activeRecording.handle = null;
+      activeRecording.live = createLiveRecording(pathForNativeBinary(),created.filePath,{format,quality:options.quality});
+    }
+    return {canceled:false,filePath:created.filePath};
   });
 
   ipcMain.handle('recording:append', async (_event, arrayBuffer) => {
     if (!activeRecording) throw new Error('錄影檔尚未建立。');
     const buffer = Buffer.from(arrayBuffer);
+    if (activeRecording.live) {
+      activeRecording.bytesWritten = await activeRecording.live.append(buffer);
+      return {bytesWritten:activeRecording.bytesWritten};
+    }
     let offset = 0;
     while (offset < buffer.length) {
       const result = await activeRecording.handle.write(buffer, offset, buffer.length - offset, activeRecording.bytesWritten);
@@ -239,13 +247,15 @@ function registerRecordingHandlers() {
 
   ipcMain.handle('recording:finalize', async () => {
     if (!activeRecording) throw new Error('找不到正在寫入的錄影檔。');
-    const { filePath, handle, bytesWritten } = activeRecording;
-    await handle.sync();
-    await handle.close();
-    activeRecording = null;
+    const { filePath, handle, live, format } = activeRecording;
+    let bytesWritten;
+    try {
+      if (live) bytesWritten = await live.finalize();
+      else { await handle.sync(); await handle.close(); bytesWritten = activeRecording.bytesWritten; }
+    } finally { activeRecording = null; }
     const token = randomUUID();
     playableRecordings.set(token, filePath);
-    return { filePath, fileUrl: `${localAppOrigin}/recordings/${token}`, bytesWritten };
+    return { filePath, fileUrl: `${localAppOrigin}/recordings/${token}`, bytesWritten, format };
   });
 
   ipcMain.handle('recording:cancel', async () => {

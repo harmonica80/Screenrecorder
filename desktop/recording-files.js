@@ -2,10 +2,11 @@ const fs = require('node:fs/promises');
 const { createReadStream } = require('node:fs');
 const path = require('node:path');
 
-async function createUniqueRecording(directory, filename) {
-  const stem = path.basename(filename, '.webm');
+async function createUniqueRecording(directory, filename, extension = 'webm') {
+  if (!['webm','mp4','mkv'].includes(extension)) throw new Error('錄影格式無效');
+  const stem = path.basename(filename, `.${extension}`);
   for (let n = 0; n < 100000; n++) {
-    const filePath = path.join(directory, `${stem}${n ? ` (${n})` : ''}.webm`);
+    const filePath = path.join(directory, `${stem}${n ? ` (${n})` : ''}.${extension}`);
     try { return { filePath, handle: await fs.open(filePath, 'wx') }; }
     catch (error) { if (error.code !== 'EEXIST') throw error; }
   }

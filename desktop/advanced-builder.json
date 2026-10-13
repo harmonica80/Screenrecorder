@@ -4,9 +4,9 @@
   "files": ["index.html","assets/**/*","!assets/.*","desktop/**/*","package.json"],
   "appId": "tw.shuwen.screenrecorder.advanced",
   "productName": "螢幕錄影工具Pro進階版",
-  "extraMetadata": {"name":"screenrecorder-pro-advanced","version":"0.2.0-beta.1","edition":"advanced"},
+  "extraMetadata": {"name":"screenrecorder-pro-advanced","version":"0.2.0-beta.2","edition":"advanced"},
   "directories": {"output":"release-advanced"},
   "extraResources": [{"from":"vendor/ffmpeg","to":"ffmpeg"}],
-  "win": {"target":[{"target":"portable","arch":["x64"]}],"artifactName":"Screenrecorder-Pro-Advanced-0.2.0-beta.1-Portable.exe"},
-  "portable": {"artifactName":"Screenrecorder-Pro-Advanced-0.2.0-beta.1-Portable.exe"}
+  "win": {"target":[{"target":"portable","arch":["x64"]}],"artifactName":"Screenrecorder-Pro-Advanced-0.2.0-beta.2-Portable.exe"},
+  "portable": {"artifactName":"Screenrecorder-Pro-Advanced-0.2.0-beta.2-Portable.exe"}
 }
