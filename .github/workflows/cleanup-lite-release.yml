@@ -1,0 +1,17 @@
+name: Remove superseded Lite release
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/cleanup-lite-release.yml']
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const old = await github.rest.repos.getReleaseByTag({...context.repo, tag: 'v0.1.5'});
+            if (old.data.id !== 411220171 || old.data.tag_name !== 'v0.1.5') throw new Error('Unexpected release');
+            await github.rest.repos.deleteRelease({...context.repo, release_id: old.data.id});

@@ -2,6 +2,19 @@
 
 適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。
 
+## Screenrecorder 螢幕錄影工具線上版
+
+**[立即開啟線上版](https://harmonica80.github.io/Screenrecorder/)**
+
+不需下載或安裝，直接使用瀏覽器進行螢幕錄影，適合教學示範、簡報解說與臨時錄製。
+
+- 可選擇螢幕、應用程式視窗或瀏覽器分頁，實際選項依瀏覽器支援情況而定。
+- 支援麥克風、可用的系統／分頁音訊、攝影機子母畫面、浮水印與錄影倒數。
+- 錄影畫面與音訊在本機瀏覽器處理；完成後可預覽並下載影片。
+- 開啟連結後，設定錄影來源與音訊，按下開始錄影並授予擷取權限；停止後下載保存。
+
+線上版的格式、音訊來源與儲存能力依瀏覽器而異，快捷鍵需網頁取得焦點。需要全域快捷鍵或桌面版持續寫入磁碟功能，可下載輕量版；需要原生 MP4／MKV／WebM 處理，可使用進階版。
+
 ## 下載 Windows 進階測試版 v0.2.0-beta.3
 
 [下載 Screenrecorder-Pro-Advanced-0.2.0-beta.3-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.3/Screenrecorder-Pro-Advanced-0.2.0-beta.3-Portable.exe)
