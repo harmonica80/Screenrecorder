@@ -225,6 +225,7 @@ function registerRecordingHandlers() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    icon: path.join(__dirname, '../assets/lite-icon.ico'),
     width: 1440,
     height: 960,
     minWidth: 1100,

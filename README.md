@@ -10,9 +10,9 @@
 
 MP4 即時錄影會增加 CPU 負擔。剪輯速度取決於編碼、畫質與電腦效能；目前精準裁切與音量調整仍需重新編碼，使用 MP4／MKV 不保證每次都能大幅加速，MKV 無損封裝則可避免重新編碼。
 
-## 下載 Windows 輕量版 v0.1.5
+## 下載 Windows 輕量版 v0.1.6
 
-[下載 Screenrecorder-Pro-Lite-0.1.5-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/v0.1.5/Screenrecorder-Pro-Lite-0.1.5-Portable.exe)
+[下載 Screenrecorder-Pro-Lite-0.1.6-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/v0.1.6/Screenrecorder-Pro-Lite-0.1.6-Portable.exe)
 
 [所有版本與更新說明](https://github.com/harmonica80/Screenrecorder/releases)
 
