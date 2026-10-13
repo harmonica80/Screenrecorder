@@ -9,6 +9,18 @@
   <script src="assets/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js"></script>
   <style>
+    html.desktop-mode main {
+      display: grid !important;
+      grid-template-columns: minmax(280px, 1fr) minmax(560px, 2fr);
+      gap: 24px; max-width: 1600px; padding: 24px;
+    }
+    html.desktop-mode main > section { width: 100% !important; min-width: 0; }
+    html.desktop-mode #downloadSection { flex-wrap: wrap; gap: 12px; }
+    html.desktop-mode #downloadSection > div:first-child { flex: 1 1 280px; }
+    html.desktop-mode #desktopSaveStatus { overflow-wrap: anywhere; }
+    #desktopFolderSettings[hidden] { display: none !important; }
+    #desktopFolderPath { overflow-wrap: anywhere; font-size: 13px; color: #475569; }
+    #desktopFolderSettings button { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; font-size: 13px; }
     @keyframes pulse-ring {
       0% {
         transform: scale(0.8);
@@ -289,6 +301,15 @@
               class="shrink-0 px-3 py-2 text-xs rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">展開</button>
           </div>
 
+        <div id="desktopFolderSettings" hidden>
+          <label class="block text-sm font-medium text-slate-700 mb-2">預設錄影影片儲存位置</label>
+          <p id="desktopFolderPath">讀取中…</p>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button type="button" id="chooseRecordingFolder">選擇資料夾</button>
+            <button type="button" id="clearRecordingFolder">改為每次詢問</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">指定後直接儲存；同名檔案自動加編號，不會覆蓋。</p>
+        </div>
         <!-- 錄影檔案命名 -->
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-2">錄影檔案命名</label>
@@ -768,11 +789,17 @@
         <span>參考<a href="https://jamespolik.pixnet.net/blog/posts/875565960578027685" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700 hover:underline font-medium transition-colors">小黃老師嘿技術 2026 螢幕錄影工具 Pro</a></span>
         <span class="text-slate-300">|</span>
         <span class="font-medium text-slate-700">述文老師改版</span>
+        <div id="desktopVersionControls" hidden style="width:100%;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px">
+          <span id="desktopVersionLabel"></span>
+          <button id="checkUpdatesBtn" type="button" style="border:1px solid #cbd5e1;border-radius:8px;background:white;padding:7px 12px">檢查更新</button>
+          <button id="openReleasesBtn" type="button" hidden style="border:1px solid #cbd5e1;border-radius:8px;background:white;padding:7px 12px">開啟版本下載頁</button>
+          <span id="updateCheckStatus" role="status" style="width:100%;font-size:12px"></span>
+        </div>
       </div>
 
       <!-- 免責聲明 -->
       <div
-        class="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-500 max-w-3xl leading-relaxed text-justify">
+        id="privacyNotice" class="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-500 max-w-3xl leading-relaxed text-justify">
         <strong class="text-slate-700">隱私與免責聲明：</strong><br>
         本網頁為純前端應用程式，運用瀏覽器內建 WebRTC、MediaRecorder 與 HTML5 Canvas API 進行多軌合成與螢幕擷取。<strong>所有資料處理、影像渲染、音訊混合與檔案打包均 100%
           在您的本地端（瀏覽器記憶體內）完成。</strong><br>
@@ -781,6 +808,9 @@
     </div>
   </footer>
 
+  <script src="assets/recording-preferences.js"></script>
+  <script src="assets/editor-export.js"></script>
+  <script src="assets/region-picker.js"></script>
   <script>
     lucide.createIcons();
     document.getElementById('currentYear').textContent = new Date().getFullYear();
@@ -918,6 +948,59 @@
     let lastCompositeFrameAt = 0;
     let forceNextCompositeFrame = false;
     let recordingDownloadBlob = null;
+    const desktopRecorder = window.desktopRecorderBridge?.isDesktop ? window.desktopRecorderBridge : null;
+    let desktopFinalizing = false;
+    let editorExportBusy = false;
+    let recordingRegion = null;
+    const regionPreview = document.createElement('canvas');
+    regionPreview.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none';
+    previewVideo.after(regionPreview);
+    if (desktopRecorder) {
+      document.documentElement.classList.add('desktop-mode');
+      document.title = `螢幕錄影工具 Pro 輕量版 ${desktopRecorder.version}`;
+      document.querySelector('h1').textContent = '螢幕錄影工具 Pro 輕量版';
+      const regionOption = displaySurfaceMode.querySelector('option[value="browser"]');
+      regionOption.value = 'region';
+      regionOption.textContent = '▧ 自訂錄影範圍（拖曳框選）';
+      if (!displaySurfaceMode.value) displaySurfaceMode.value = 'monitor';
+      const versionControls = document.getElementById('desktopVersionControls');
+      versionControls.hidden = false;
+      versionControls.style.display = 'flex';
+      document.getElementById('desktopVersionLabel').textContent = `免安裝輕量版 v${desktopRecorder.version}`;
+      document.getElementById('privacyNotice').innerHTML = '<strong class="text-slate-700">隱私與使用說明：</strong><br>本軟體為 Windows 免安裝錄影工具。螢幕擷取、攝影機合成與音訊混合均在您的電腦上處理；錄影資料持續寫入您選擇的本機資料夾，以 WebM 格式儲存。錄影長度仍受可用磁碟空間與電腦效能影響。<br>本軟體不會將錄影畫面或音訊上傳至伺服器。檢查更新會連線至 GitHub；部分選用功能可能需要下載外部資源。錄製內容的使用授權與相關責任，請由使用者自行確認。';
+      document.getElementById('openReleasesBtn').addEventListener('click', () => desktopRecorder.openReleases().catch(error => { document.getElementById('updateCheckStatus').textContent = error.message; }));
+      document.getElementById('checkUpdatesBtn').addEventListener('click', async event => {
+        const button = event.currentTarget;
+        const status = document.getElementById('updateCheckStatus');
+        const downloadButton = document.getElementById('openReleasesBtn');
+        button.disabled = true;
+        downloadButton.hidden = true;
+        status.textContent = '正在檢查新版本…';
+        try {
+          const result = await desktopRecorder.checkForUpdates();
+          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? '尚無公開發布的輕量版版本，暫時無法比對更新。' : `目前 v${result.currentVersion} 已是最新可用版本。`;
+          downloadButton.hidden = result.status !== 'available';
+        } catch (error) { status.textContent = '檢查更新失敗，請確認網路後重試。' + error.message; }
+        finally { button.disabled = false; }
+      });
+      document.getElementById('desktopFolderSettings').hidden = false;
+      const folderPath = document.getElementById('desktopFolderPath');
+      const showFolder = folder => { folderPath.textContent = folder || '尚未指定（每次開始錄影時詢問）'; };
+      desktopRecorder.getRecordingFolder().then(showFolder).catch(error => { folderPath.textContent = error.message; });
+      for (const [id, action] of [['chooseRecordingFolder', 'chooseRecordingFolder'], ['clearRecordingFolder', 'clearRecordingFolder']]) {
+        document.getElementById(id).addEventListener('click', async event => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          try { showFolder(await desktopRecorder[action]()); }
+          catch (error) { alert('設定儲存位置失敗：' + error.message); }
+          finally { button.disabled = false; }
+        });
+      }
+    }
+    let desktopWriteQueue = Promise.resolve();
+    let desktopWriteError = null;
+    let desktopRecordingInfo = null;
+    let desktopPendingPath = '';
     const COMPOSITE_FRAME_INTERVAL = 1000 / 30;
 
     let totalRecordedTime = 0;
@@ -946,8 +1029,14 @@
     const watermarkImage = new Image();
     let segmentationLoopId = null;
 
-    outputEngineSelect.value = localStorage.getItem('screenRecorderOutputEngine') || 'fast';
-    outputEngineSelect.addEventListener('change', () => localStorage.setItem('screenRecorderOutputEngine', outputEngineSelect.value));
+    outputEngineSelect.value = window.recordingPreferences.storage.getItem('screenRecorderOutputEngine') || 'fast';
+    outputEngineSelect.addEventListener('change', () => window.recordingPreferences.storage.setItem('screenRecorderOutputEngine', outputEngineSelect.value));
+    if (desktopRecorder) {
+      outputEngineSelect.innerHTML = '<option value="compatible">本機輸出（依片段長度播放，直接存檔）</option>';
+      outputEngineSelect.value = 'compatible';
+      outputEngineSelect.parentElement.nextElementSibling.textContent = '輕量版以本機播放重新輸出 WebM，不需下載轉檔引擎。輸出時間接近片段長度；音量節點會套用至輸出影片，完成後可開啟檔案所在資料夾。';
+      editorPanel.querySelector('p').textContent = '裁切、分割與音量調整在本機重新輸出影片。';
+    }
 
     // 重新排列設定：倒數、浮水印置於攝影機上方，子母畫面設定併入攝影機區塊。
     const cameraSection = document.createElement('div');
@@ -964,9 +1053,9 @@
         panel.classList.toggle('panel-collapsed', collapsed);
         button.textContent = collapsed ? '展開' : '收合';
         button.setAttribute('aria-expanded', String(!collapsed));
-        localStorage.setItem(storageKey, String(collapsed));
+        window.recordingPreferences.storage.setItem(storageKey, String(collapsed));
       };
-      applyState(localStorage.getItem(storageKey) !== 'false');
+      applyState(window.recordingPreferences.storage.getItem(storageKey) !== 'false');
       button.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
@@ -985,21 +1074,21 @@
     const personCanvas = document.createElement('canvas');
     const personCtx = personCanvas.getContext('2d');
 
-    countdownToggle.checked = localStorage.getItem('screenRecorderCountdown') !== 'false';
-    cameraQualitySelect.value = localStorage.getItem('screenRecorderCameraQuality') || 'high';
-    segmentationQualitySelect.value = localStorage.getItem('screenRecorderSegmentationQuality') || 'quality';
-    countdownSecondsSelect.value = localStorage.getItem('screenRecorderCountdownSeconds') || '3';
+    countdownToggle.checked = window.recordingPreferences.storage.getItem('screenRecorderCountdown') !== 'false';
+    cameraQualitySelect.value = window.recordingPreferences.storage.getItem('screenRecorderCameraQuality') || 'high';
+    segmentationQualitySelect.value = window.recordingPreferences.storage.getItem('screenRecorderSegmentationQuality') || 'quality';
+    countdownSecondsSelect.value = window.recordingPreferences.storage.getItem('screenRecorderCountdownSeconds') || '3';
     countdownSecondsSelect.disabled = !countdownToggle.checked;
     countdownToggle.addEventListener('change', () => {
-      localStorage.setItem('screenRecorderCountdown', countdownToggle.checked);
+      window.recordingPreferences.storage.setItem('screenRecorderCountdown', countdownToggle.checked);
       countdownSecondsSelect.disabled = !countdownToggle.checked;
     });
     countdownSecondsSelect.addEventListener('change', () => {
-      localStorage.setItem('screenRecorderCountdownSeconds', countdownSecondsSelect.value);
+      window.recordingPreferences.storage.setItem('screenRecorderCountdownSeconds', countdownSecondsSelect.value);
     });
 
-    filenameModeSelect.value = localStorage.getItem('screenRecorderFilenameMode') || 'sequence';
-    recordingSequenceInput.value = localStorage.getItem('screenRecorderSequence') || '1';
+    filenameModeSelect.value = window.recordingPreferences.storage.getItem('screenRecorderFilenameMode') || 'sequence';
+    recordingSequenceInput.value = window.recordingPreferences.storage.getItem('screenRecorderSequence') || '1';
 
     function getLocalDateString() {
       const now = new Date();
@@ -1020,8 +1109,8 @@
     function updateFilenamePreview() {
       const sequence = Math.max(1, Math.min(99, Number(recordingSequenceInput.value) || 1));
       recordingSequenceInput.value = sequence;
-      localStorage.setItem('screenRecorderFilenameMode', filenameModeSelect.value);
-      localStorage.setItem('screenRecorderSequence', sequence);
+      window.recordingPreferences.storage.setItem('screenRecorderFilenameMode', filenameModeSelect.value);
+      window.recordingPreferences.storage.setItem('screenRecorderSequence', sequence);
       filenamePreview.textContent = getRecordingBaseName();
     }
 
@@ -1029,10 +1118,22 @@
     recordingSequenceInput.addEventListener('input', updateFilenamePreview);
     updateFilenamePreview();
 
-    encodingPresetSelect.value = localStorage.getItem('screenRecorderEncodingPreset') || 'auto';
+    encodingPresetSelect.value = window.recordingPreferences.storage.getItem('screenRecorderEncodingPreset') || 'auto';
+    if (desktopRecorder) {
+      encodingPresetSelect.querySelector('option[value="h264"]').remove();
+      const labels = {
+        auto: '自動選擇：WebM（5 Mbps）',
+        vp9: '平衡：VP9 + Opus／WebM（3.5 Mbps）',
+        av1: '小檔案：AV1 + Opus／WebM（2.5 Mbps）',
+        high: '高畫質：VP9 + Opus／WebM（8 Mbps）'
+      };
+      for (const option of encodingPresetSelect.options) option.textContent = labels[option.value];
+      if (!encodingPresetSelect.value) encodingPresetSelect.value = 'auto';
+      encodingStatus.textContent = '輕量版僅輸出 WebM，目前不提供 MP4 轉檔；不支援的編碼會自動改用可用格式。';
+    }
     encodingPresetSelect.addEventListener('change', () => {
-      localStorage.setItem('screenRecorderEncodingPreset', encodingPresetSelect.value);
-      encodingStatus.textContent = '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
+      window.recordingPreferences.storage.setItem('screenRecorderEncodingPreset', encodingPresetSelect.value);
+      encodingStatus.textContent = desktopRecorder ? '輕量版僅輸出 WebM，目前不提供 MP4 轉檔。實際編碼將於開始錄影時確認。' : '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
     });
 
     function selectRecordingEncoding() {
@@ -1064,6 +1165,11 @@
         }
       };
       const preset = presets[encodingPresetSelect.value];
+      if (desktopRecorder) {
+        const desktopTypes = preset.types.filter(type => type.includes('webm'));
+        if (!desktopTypes.length) desktopTypes.push('video/webm;codecs=vp9,opus', 'video/webm');
+        preset.types = desktopTypes;
+      }
       const mimeType = preset.types.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
       return { ...preset, mimeType, usedFallback: !preset.types.slice(0, 1).includes(mimeType) };
     }
@@ -1086,9 +1192,9 @@
       pause: pauseHotkeyInput,
       stop: stopHotkeyInput
     };
-    recordHotkeyInput.value = localStorage.getItem('screenRecorderRecordHotkey') || 'F9';
-    pauseHotkeyInput.value = localStorage.getItem('screenRecorderPauseHotkey') || 'F9';
-    stopHotkeyInput.value = localStorage.getItem('screenRecorderStopHotkey') || 'F10';
+    recordHotkeyInput.value = window.recordingPreferences.storage.getItem('screenRecorderRecordHotkey') || 'F9';
+    pauseHotkeyInput.value = window.recordingPreferences.storage.getItem('screenRecorderPauseHotkey') || 'F9';
+    stopHotkeyInput.value = window.recordingPreferences.storage.getItem('screenRecorderStopHotkey') || 'F10';
     Object.entries(hotkeyInputs).forEach(([name, input]) => {
       input.addEventListener('keydown', event => {
         event.preventDefault();
@@ -1096,12 +1202,37 @@
         const shortcut = shortcutFromEvent(event);
         if (!shortcut) return;
         input.value = shortcut;
-        localStorage.setItem(`screenRecorder${name[0].toUpperCase() + name.slice(1)}Hotkey`, shortcut);
+        window.recordingPreferences.storage.setItem(`screenRecorder${name[0].toUpperCase() + name.slice(1)}Hotkey`, shortcut);
         input.blur();
       });
     });
 
+    function executeRecordingShortcut(shortcut) {
+      if (editorExportBusy) return;
+      if (isRecording && shortcut === stopHotkeyInput.value) stopRecording();
+      else if (isRecording && shortcut === pauseHotkeyInput.value) togglePause();
+      else if (!isRecording && !isPreparing && playbackVideo.classList.contains('hidden') && shortcut === recordHotkeyInput.value) startRecording();
+    }
+    if (desktopRecorder) {
+      const notice = document.createElement('p');
+      notice.style.cssText = 'font-size:12px;color:#64748b;grid-column:1 / -1';
+      stopHotkeyInput.parentElement.parentElement.appendChild(notice);
+      const configure = async () => {
+        try {
+          const failed = await desktopRecorder.configureShortcuts(Object.fromEntries(Object.entries(hotkeyInputs).map(([name, input]) => [name, input.value])));
+          notice.textContent = failed.length ? `無法註冊全域快捷鍵：${failed.join('、')}。可能被其他程式占用，請更換按鍵。` : '全域快捷鍵已啟用，切換到其他程式仍可操作。';
+        } catch (error) { notice.textContent = '快捷鍵設定失敗：' + error.message; }
+      };
+      for (const input of Object.values(hotkeyInputs)) {
+        input.addEventListener('focus', () => desktopRecorder.configureShortcuts({}).catch(() => {}));
+        input.addEventListener('blur', configure);
+        input.addEventListener('change', configure);
+      }
+      desktopRecorder.onShortcut(executeRecordingShortcut);
+      configure();
+    }
     document.addEventListener('keydown', event => {
+      if (desktopRecorder) return;
       if (event.repeat || event.target.classList?.contains('hotkey-input')) return;
       const shortcut = shortcutFromEvent(event);
       if (!shortcut) return;
@@ -1309,7 +1440,7 @@
     }
     backgroundEffectSelect.addEventListener('change', applyBackgroundEffect);
     segmentationQualitySelect.addEventListener('change', () => {
-      localStorage.setItem('screenRecorderSegmentationQuality', segmentationQualitySelect.value);
+      window.recordingPreferences.storage.setItem('screenRecorderSegmentationQuality', segmentationQualitySelect.value);
       if (backgroundEffectSelect.value !== 'none') startSegmentationLoop();
     });
     applyCameraAppearance();
@@ -1489,7 +1620,7 @@
     }
 
     function populateDeviceSelect(select, devices, fallbackName) {
-      const previousValue = select.value || localStorage.getItem(`${select.id}Value`) || '';
+      const previousValue = select.value || window.recordingPreferences.storage.getItem(`${select.id}Value`) || '';
       select.innerHTML = `<option value="">系統預設${fallbackName}</option>`;
 
       devices.forEach((device, index) => {
@@ -1505,7 +1636,7 @@
     }
 
     [micDeviceSelect, cameraDeviceSelect].forEach(select => {
-      select.addEventListener('change', () => localStorage.setItem(`${select.id}Value`, select.value));
+      select.addEventListener('change', () => window.recordingPreferences.storage.setItem(`${select.id}Value`, select.value));
     });
     cameraToggle.addEventListener('change', async () => {
       if (cameraToggle.checked) {
@@ -1518,7 +1649,7 @@
       if (cameraToggle.checked) await startCameraPreview(false);
     });
     cameraQualitySelect.addEventListener('change', async () => {
-      localStorage.setItem('screenRecorderCameraQuality', cameraQualitySelect.value);
+      window.recordingPreferences.storage.setItem('screenRecorderCameraQuality', cameraQualitySelect.value);
       if (cameraToggle.checked) await startCameraPreview(false);
     });
 
@@ -1733,6 +1864,9 @@
     }
 
     function setUIState(state) {
+      if (desktopRecorder) desktopRecorder.setRecordingIndicator(
+        state === 'recording' || state === 'paused' ? state : 'idle'
+      ).catch(error => console.warn('工作列錄影提示更新失敗', error));
       switch (state) {
         case 'ready':
           countdownOverlay.classList.add('hidden');
@@ -1839,14 +1973,20 @@
 
       // 以螢幕畫面作為基準解析度
       // 錄影開始後固定畫布尺寸，避免來源或浮動攝影機尺寸變化時重新建立影像緩衝區而抖動。
-      if (!canvasVideoTrack && previewVideo.videoWidth > 0 && canvas.width !== previewVideo.videoWidth) {
-        canvas.width = Math.max(2, Math.floor(previewVideo.videoWidth / 2) * 2);
-        canvas.height = Math.max(2, Math.floor(previewVideo.videoHeight / 2) * 2);
+      if (!canvasVideoTrack && previewVideo.videoWidth > 0) {
+        const width = recordingRegion?.width || Math.max(2, Math.floor(previewVideo.videoWidth / 2) * 2);
+        const height = recordingRegion?.height || Math.max(2, Math.floor(previewVideo.videoHeight / 2) * 2);
+        if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
       }
 
       if (canvas.width > 0 && canvas.height > 0) {
         // 1. 畫底圖 (螢幕)
-        ctx.drawImage(previewVideo, 0, 0, canvas.width, canvas.height);
+        if (recordingRegion) {
+          const r = recordingRegion;
+          ctx.drawImage(previewVideo, r.x, r.y, r.width, r.height, 0, 0, canvas.width, canvas.height);
+          if (regionPreview.width !== canvas.width || regionPreview.height !== canvas.height) { regionPreview.width = canvas.width; regionPreview.height = canvas.height; }
+          regionPreview.getContext('2d').drawImage(canvas, 0, 0);
+        } else ctx.drawImage(previewVideo, 0, 0, canvas.width, canvas.height);
 
         // 2. 畫上層 (攝影機子母畫面)
         if (cameraToggle.checked && isCameraVisible && webcamVideo.videoWidth > 0) {
@@ -1983,23 +2123,45 @@
 
     // 啟動錄製流程
     async function startRecording() {
+      if (editorExportBusy || isPreparing || desktopFinalizing || (mediaRecorder && mediaRecorder.state !== 'inactive')) return;
       try {
         recordedChunks = [];
+        desktopWriteQueue = Promise.resolve();
+        desktopWriteError = null;
+        desktopPendingPath = '';
         isPreparing = true;
+        recordingRegion = null;
+        regionPreview.style.display = 'none';
+        previewVideo.style.visibility = '';
+        videoArea.style.aspectRatio = '';
         isRecording = true; // 讓畫布在倒數期間先顯示即時預覽
         setUIState('preparing');
 
         // 1. 獲取螢幕畫面 (依據下拉選單偏好設定)
         const displayMediaOptions = {
           video: {
-            displaySurface: displaySurfaceMode.value,
+            displaySurface: displaySurfaceMode.value === 'region' ? 'monitor' : displaySurfaceMode.value,
             frameRate: { ideal: 30, max: 30 },
             cursor: 'always'
           },
           audio: sysAudioToggle.checked
         };
+        if (desktopRecorder && !await chooseDesktopCaptureSource()) {
+          const canceledError = new Error('使用者取消選擇錄影畫面。');
+          canceledError.name = 'AbortError';
+          throw canceledError;
+        }
         screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
         previewVideo.srcObject = screenStream;
+        if (desktopRecorder && displaySurfaceMode.value === 'region') {
+          await previewVideo.play();
+          if (!previewVideo.videoWidth) await new Promise(resolve => previewVideo.addEventListener('loadedmetadata', resolve, { once: true }));
+          recordingRegion = await window.chooseRecordingRegion(previewVideo);
+          if (!recordingRegion) { const error = new Error('已取消選擇錄影範圍。'); error.name = 'AbortError'; throw error; }
+          previewVideo.style.visibility = 'hidden';
+          regionPreview.style.display = 'block';
+          videoArea.style.aspectRatio = `${recordingRegion.width} / ${recordingRegion.height}`;
+        }
 
         screenStream.getVideoTracks()[0].onended = () => {
           if (isRecording || isPreparing) cancelPendingOrActiveRecording();
@@ -2079,6 +2241,17 @@
         recordingMimeType = encoding.mimeType;
         encodingStatus.textContent = `實際使用：${encoding.label} · ${encoding.mimeType} · ${(encoding.bitRate / 1000000).toFixed(1)} Mbps${encoding.usedFallback ? '（瀏覽器已自動改用可用格式）' : ''}`;
 
+        if (desktopRecorder) {
+          const prepared = await desktopRecorder.prepareRecording(`${getRecordingBaseName()}.webm`);
+          if (prepared.canceled) {
+            const canceledError = new Error('使用者取消選擇儲存位置。');
+            canceledError.name = 'AbortError';
+            throw canceledError;
+          }
+          desktopPendingPath = prepared.filePath;
+          updateDesktopSaveStatus(`準備寫入：${desktopPendingPath}`);
+        }
+
         mediaRecorder = new MediaRecorder(mixedStream, {
           mimeType: encoding.mimeType,
           videoBitsPerSecond: encoding.bitRate,
@@ -2086,7 +2259,20 @@
         });
 
         mediaRecorder.ondataavailable = function (e) {
-          if (e.data.size > 0) recordedChunks.push(e.data);
+          if (!e.data.size) return;
+          if (!desktopRecorder) {
+            recordedChunks.push(e.data);
+            return;
+          }
+          desktopWriteQueue = desktopWriteQueue.then(async () => {
+            if (desktopWriteError) return;
+            const result = await desktopRecorder.appendChunk(await e.data.arrayBuffer());
+            updateDesktopSaveStatus(`正在寫入硬碟：${formatFileSize(result.bytesWritten)} · ${desktopPendingPath}`);
+          }).catch(error => {
+            desktopWriteError = error;
+            console.error('錄影資料寫入失敗：', error);
+            updateDesktopSaveStatus(`寫入失敗：${error.message}`, true);
+          });
         };
 
         mediaRecorder.onstop = exportVideo;
@@ -2113,6 +2299,10 @@
         isRecording = false;
         isPreparing = false;
         stopCompositeScheduler();
+        if (desktopRecorder && desktopPendingPath) {
+          await desktopRecorder.cancelRecording().catch(() => {});
+          desktopPendingPath = '';
+        }
 
         // 避免將瀏覽器的原生權限錯誤訊息直接用 alert() 強制彈出干擾使用者
         const errMsg = err.message || '';
@@ -2152,6 +2342,10 @@
         previewVideo.srcObject = null;
         webcamVideo.srcObject = null;
         webcamContainer.style.display = 'none';
+        if (desktopRecorder && desktopPendingPath) {
+          desktopRecorder.cancelRecording().catch(() => {});
+          desktopPendingPath = '';
+        }
         setUIState('ready');
         videoPlaceholder.classList.remove('hidden');
         previewContainer.classList.add('hidden');
@@ -2180,6 +2374,7 @@
     }
 
     function stopRecording() {
+      if (desktopRecorder) desktopRecorder.setRecordingIndicator('idle').catch(() => {});
       if (!isPaused && lastResumeTime) totalRecordedTime += Date.now() - lastResumeTime;
       recordedDurationSeconds = Math.max(0.1, totalRecordedTime / 1000);
       isRecording = false;
@@ -2190,12 +2385,57 @@
         mediaRecorder.stop();
       }
       stopMediaTracks();
-      setUIState('finished');
+      if (desktopRecorder) {
+        desktopFinalizing = true;
+        startBtn.disabled = true;
+        newRecordBtn.disabled = true;
+        stopBtn.disabled = true;
+        statusText.textContent = '正在完成影片儲存…';
+      } else setUIState('finished');
     }
 
-    function exportVideo() {
+    async function exportVideo() {
       const mimeType = recordingMimeType;
       const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+
+      if (desktopRecorder) {
+        await desktopWriteQueue;
+        if (desktopWriteError) {
+          alert(`影片寫入失敗：${desktopWriteError.message}`);
+          await desktopRecorder.finalizeRecording().catch(() => {});
+          desktopFinalizing = false;
+          startBtn.disabled = newRecordBtn.disabled = stopBtn.disabled = false;
+          setUIState('ready');
+          return;
+        }
+        try {
+          desktopRecordingInfo = await desktopRecorder.finalizeRecording();
+          desktopPendingPath = '';
+          setUIState('finished');
+          playbackVideo.onerror = () => updateDesktopSaveStatus('影片已儲存，但播放失敗。請使用「在資料夾中顯示」開啟檔案。', true);
+          playbackVideo.onloadedmetadata = () => {
+            if (!Number.isFinite(playbackVideo.duration)) {
+              recoverVideoDuration(playbackVideo).then(() => { playbackVideo.currentTime = 0; }).catch(() => {});
+            }
+          };
+          playbackVideo.src = desktopRecordingInfo.fileUrl;
+          playbackVideo.load();
+          editorPanel.classList.add('hidden');
+          downloadLink.removeAttribute('href');
+          downloadLink.innerHTML = '<i data-lucide="folder-open" class="w-5 h-5"></i> 在資料夾中顯示';
+          updateDesktopSaveStatus(`已儲存：${formatFileSize(desktopRecordingInfo.bytesWritten)} · ${desktopRecordingInfo.filePath}`);
+          lucide.createIcons();
+          advanceRecordingSequence();
+        } catch (error) {
+          console.error('完成錄影檔失敗：', error);
+          alert(`無法完成錄影檔：${error.message}`);
+          setUIState('ready');
+        } finally {
+          desktopFinalizing = false;
+          startBtn.disabled = newRecordBtn.disabled = stopBtn.disabled = false;
+        }
+        return;
+      }
 
       const blob = new Blob(recordedChunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
@@ -2207,9 +2447,105 @@
       downloadLink.href = url;
       downloadLink.download = `${baseName}.${ext}`;
 
+      advanceRecordingSequence();
+    }
+
+    function advanceRecordingSequence() {
       const currentSequence = Math.max(1, Math.min(99, Number(recordingSequenceInput.value) || 1));
       recordingSequenceInput.value = currentSequence >= 99 ? 1 : currentSequence + 1;
       updateFilenamePreview();
+    }
+
+    function formatFileSize(bytes) {
+      if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+      return `${(bytes / 1024 ** index).toFixed(index >= 3 ? 2 : 1)} ${units[index]}`;
+    }
+
+    const desktopSaveStatus = document.createElement('p');
+    desktopSaveStatus.id = 'desktopSaveStatus';
+    desktopSaveStatus.className = 'text-xs text-slate-500 mt-1 break-all';
+    desktopSaveStatus.hidden = !desktopRecorder;
+    downloadSection.querySelector('h3').parentElement.appendChild(desktopSaveStatus);
+    if (desktopRecorder) downloadSection.querySelector('h3 + p').textContent = '影片已直接儲存到硬碟，可在下方播放。';
+
+    function updateDesktopSaveStatus(message, isError = false) {
+      if (!desktopRecorder) return;
+      desktopSaveStatus.hidden = false;
+      desktopSaveStatus.textContent = message;
+      desktopSaveStatus.className = `text-xs mt-1 break-all ${isError ? 'text-red-600' : 'text-slate-500'}`;
+    }
+
+    async function chooseDesktopCaptureSource() {
+      if (!desktopRecorder) return true;
+      const kind = ['monitor', 'region'].includes(displaySurfaceMode.value) ? 'screen' : 'window';
+      return new Promise(resolve => {
+        let closed = false;
+        const overlay = document.createElement('div');
+        overlay.id = 'desktopSourcePicker';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(2,6,23,.8);display:flex;align-items:center;justify-content:center;padding:24px';
+        overlay.className = 'fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-6';
+        const panel = document.createElement('div');
+        panel.style.cssText = 'width:100%;max-width:1000px;max-height:88vh;overflow:auto;background:white;border-radius:16px;padding:16px';
+        panel.className = 'w-full max-w-5xl max-h-[88vh] overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col';
+        panel.innerHTML = `
+          <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
+            <div><h2 class="text-xl font-bold text-slate-800">選擇錄影畫面</h2><p class="text-sm text-slate-500">${kind === 'screen' ? '請選擇要錄製的螢幕' : '請選擇要錄製的應用程式視窗'}</p></div>
+            <button type="button" data-cancel class="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">取消</button>
+          </div>
+          <div data-grid class="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto p-6"></div>`;
+        const grid = panel.querySelector('[data-grid]');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;padding:16px;overflow:auto';
+        grid.textContent = '正在讀取螢幕／視窗清單…';
+        const timeout = setTimeout(() => {
+          if (!closed) grid.textContent = '讀取超過 15 秒，請取消後重試。若持續發生，請回報此訊息。';
+        }, 15000);
+        desktopRecorder.listCaptureSources(kind).then(sources => {
+          clearTimeout(timeout);
+          if (closed) return;
+          grid.textContent = sources.length ? '' : '找不到可錄製的畫面，請取消並確認目標視窗已開啟。';
+          sources.forEach(source => {
+          const button = document.createElement('button');
+          button.style.cssText = 'border:2px solid #cbd5e1;border-radius:12px;padding:8px;background:white;color:#0f172a;cursor:pointer;text-align:left';
+          button.type = 'button';
+          button.className = 'group overflow-hidden rounded-xl border-2 border-slate-200 bg-white text-left transition hover:border-blue-500 hover:shadow-lg focus:border-blue-600 focus:outline-none';
+          button.innerHTML = `<img src="${source.thumbnail}" alt="" class="aspect-video w-full bg-slate-900 object-contain"><span class="block truncate px-3 py-2 text-sm font-medium text-slate-700">${escapeHtml(source.name)}</span>`;
+          button.querySelector('img').style.cssText = 'display:block;width:100%;height:auto;aspect-ratio:auto;object-fit:contain;background:transparent';
+          button.addEventListener('click', async () => {
+            try {
+            await desktopRecorder.selectCaptureSource({ id: source.id, includeAudio: sysAudioToggle.checked });
+            closed = true;
+            overlay.remove();
+            resolve(true);
+            } catch (error) { grid.textContent = '選擇畫面失敗：' + error.message; }
+          });
+          grid.appendChild(button);
+          });
+        }).catch(error => {
+          clearTimeout(timeout);
+          if (!closed) grid.textContent = '無法讀取畫面清單：' + error.message;
+        });
+        panel.querySelector('[data-cancel]').addEventListener('click', () => {
+          closed = true;
+          clearTimeout(timeout);
+          overlay.remove();
+          resolve(false);
+        });
+        overlay.addEventListener('click', event => {
+          if (event.target !== overlay) return;
+          closed = true;
+          clearTimeout(timeout);
+          overlay.remove();
+          resolve(false);
+        });
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
     }
 
     function getVideoFilePickerTypes(fileName, mimeType = '') {
@@ -2258,6 +2594,11 @@
     }
 
     downloadLink.addEventListener('click', async event => {
+      if (desktopRecorder && desktopRecordingInfo) {
+        event.preventDefault();
+        await desktopRecorder.showInFolder(desktopRecordingInfo.filePath);
+        return;
+      }
       if (!recordingDownloadBlob || !window.showSaveFilePicker) return;
       event.preventDefault();
       await downloadCurrentRecording();
@@ -2785,6 +3126,14 @@
     }
 
     async function renderClip(start, end, label, useVolumeEnvelope = false) {
+      if (desktopRecorder) {
+        const info = await window.exportDesktopClip({ url: editorSourceUrl, start, end,
+          filename: `${getRecordingBaseName()}_${label}.webm`,
+          gainAt: seconds => useVolumeEnvelope ? getEnvelopeGainAt(seconds) : 100,
+          onProgress: percent => { editorStatus.textContent = `正在輸出${label}：${percent}%（依片段長度播放輸出）`; }
+        });
+        return { desktopFile: info, label };
+      }
       if (outputEngineSelect.value !== 'fast') return renderEditedClip(start, end, label, useVolumeEnvelope);
       try {
         return await renderFastClip(start, end, label, useVolumeEnvelope);
@@ -2842,6 +3191,16 @@
     }
 
     function addEditorDownload(result) {
+      if (result.desktopFile) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'px-3 py-2 rounded-lg bg-emerald-100 text-emerald-800 text-xs';
+        button.textContent = `開啟${result.label}所在資料夾`;
+        button.title = result.desktopFile.filePath;
+        button.addEventListener('click', () => desktopRecorder.showInFolder(result.desktopFile.filePath));
+        splitDownloads.appendChild(button);
+        return;
+      }
       const url = URL.createObjectURL(result.blob);
       const link = document.createElement('a');
       link.href = url;
@@ -2936,17 +3295,36 @@
       splitTimeInput.value = formatEditorTime(Math.max(0.1, Math.min(editorVideoDuration - 0.1, playbackVideo.currentTime)));
       splitVideoBtn.click();
     });
+    let editorDisabledStates = [];
+    function beginEditorExport() {
+      if (editorExportBusy || isRecording || isPreparing || desktopFinalizing) return false;
+      editorExportBusy = true;
+      playbackVideo.pause();
+      editorDisabledStates = [...editorPanel.querySelectorAll('button,input,select'), editorVideoInput, startBtn, newRecordBtn].map(control => [control, control.disabled]);
+      for (const [control] of editorDisabledStates) control.disabled = true;
+      waveformTrack.style.pointerEvents = 'none';
+      timelineTrack.style.pointerEvents = 'none';
+      return true;
+    }
+    function endEditorExport() {
+      editorExportBusy = false;
+      for (const [control, disabled] of editorDisabledStates) control.disabled = disabled;
+      waveformTrack.style.pointerEvents = '';
+      timelineTrack.style.pointerEvents = '';
+    }
     exportTrimBtn.addEventListener('click', async () => {
+      if (!beginEditorExport()) return;
       try {
         const { start, end } = getEditRange();
         exportTrimBtn.disabled = true;
         editorStatus.textContent = '正在輸出裁切影片，請稍候…';
         addEditorDownload(await renderClip(start, end, '裁切', true));
-        editorStatus.textContent = '裁切與音量調整完成，可以下載。';
+        editorStatus.textContent = desktopRecorder ? '裁切與音量調整完成，影片已儲存。' : '裁切與音量調整完成，可以下載。';
       } catch (error) { editorStatus.textContent = error.message; }
-      finally { exportTrimBtn.disabled = false; }
+      finally { endEditorExport(); }
     });
     splitVideoBtn.addEventListener('click', async () => {
+      if (!beginEditorExport()) return;
       try {
         const split = parseEditorTime(splitTimeInput.value);
         const duration = editorVideoDuration;
@@ -2956,19 +3334,20 @@
         splitDownloads.innerHTML = '';
         addEditorDownload(await renderClip(0, split, '第1段', true));
         addEditorDownload(await renderClip(split, duration, '第2段', true));
-        editorStatus.textContent = '分割與音量調整完成，可以分別下載兩段影片。';
+        editorStatus.textContent = desktopRecorder ? '分割與音量調整完成，兩段影片已分別儲存。' : '分割與音量調整完成，可以分別下載兩段影片。';
       } catch (error) { editorStatus.textContent = error.message; }
-      finally { splitVideoBtn.disabled = false; }
+      finally { endEditorExport(); }
     });
     exportVolumeBtn.addEventListener('click', async () => {
+      if (!beginEditorExport()) return;
       try {
         const { start, end } = getEditRange();
         exportVolumeBtn.disabled = true;
         editorStatus.textContent = '正在套用局部音量節點並重新輸出影片，請稍候…';
         addEditorDownload(await renderClip(start, end, '局部音量調整', true));
-        editorStatus.textContent = '局部音量調整完成，可以下載。';
+        editorStatus.textContent = desktopRecorder ? '局部音量調整完成，影片已儲存。' : '局部音量調整完成，可以下載。';
       } catch (error) { editorStatus.textContent = error.message; }
-      finally { exportVolumeBtn.disabled = false; }
+      finally { endEditorExport(); }
     });
 
     function clearFinishedRecording() {
@@ -2982,6 +3361,8 @@
         downloadLink.removeAttribute('href');
       }
       recordingDownloadBlob = null;
+      desktopRecordingInfo = null;
+      desktopPendingPath = '';
       recordedChunks = [];
       videoArea.classList.remove('border-emerald-400');
       editorPanel.classList.add('hidden');
@@ -2989,7 +3370,14 @@
     }
 
     async function beginNextRecording() {
-      if (recordingDownloadBlob) {
+      if (editorExportBusy || desktopFinalizing || isPreparing) return;
+      if (desktopRecordingInfo) {
+        const shouldContinue = confirm(
+          `目前影片已經儲存完成：\n${desktopRecordingInfo.filePath}\n\n是否開始新的錄影？`
+        );
+        if (!shouldContinue) return;
+        clearFinishedRecording();
+      } else if (recordingDownloadBlob) {
         const shouldDownload = confirm(
           '目前已有錄製完成的影片。\n\n按「確定」：先下載目前影片，再開始新的錄影。\n按「取消」：不下載目前影片，直接開始新的錄影。'
         );
@@ -3005,6 +3393,7 @@
     pauseBtn.addEventListener('click', togglePause);
     stopBtn.addEventListener('click', stopRecording);
     newRecordBtn.addEventListener('click', beginNextRecording);
+    window.recordingPreferences.initialize(() => editorExportBusy || isRecording || isPreparing || desktopFinalizing);
 
     // 檢查瀏覽器是否支援 WebRTC 螢幕錄影 (getDisplayMedia)
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
