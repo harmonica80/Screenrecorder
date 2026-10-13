@@ -1,6 +1,14 @@
 # 螢幕錄影工具 Pro（Screenrecorder）
 
-適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **Windows 免安裝輕量版**與原始網頁版。
+適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。
+
+## 下載 Windows 進階測試版 v0.2.0-beta.3
+
+[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.3-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.3/Screenrecorder-Pro-Advanced-0.2.0-beta.3-Portable.exe)
+
+內建原生 FFmpeg，支援即時 MP4／MKV／WebM 錄影、錄完轉檔、裁切、分割與音量調整。beta.3 更新應用程式圖示、頁尾版本介紹與 GitHub 連結，外部連結以系統預設瀏覽器開啟。
+
+MP4 即時錄影會增加 CPU 負擔。剪輯速度取決於編碼、畫質與電腦效能；目前精準裁切與音量調整仍需重新編碼，使用 MP4／MKV 不保證每次都能大幅加速，MKV 無損封裝則可避免重新編碼。
 
 ## 下載 Windows 輕量版 v0.1.5
 
@@ -20,7 +28,17 @@
 - **基本剪輯**：載入本機影片後可裁切、在播放頭分割與調整音量節點。以本機播放重新輸出 WebM，所需時間接近片段長度，並直接存檔。
 - **設定與狀態**：預設儲存資料夾、記住上次設定、重設預設值、工作列錄影閃爍紅點，以及檢查新版本。
 
-## 版本差異
+## 三種版本
+
+| 版本 | 適合用途 | 影片格式與處理 |
+|---|---|---|
+| 網頁版 | 使用瀏覽器快速錄影 | 依瀏覽器支援能力 |
+| 輕量版 | 免安裝、低負擔錄影 | WebM，剪輯以播放方式輸出 |
+| 進階版 | 多格式錄影與原生剪輯 | MP4／MKV／WebM，內建 FFmpeg |
+
+進階版原始碼與建置說明：[advanced-preview 分支](https://github.com/harmonica80/Screenrecorder/tree/advanced-preview)。
+
+## 網頁版與輕量版差異
 
 | 項目 | Windows 輕量版 | 原始網頁版 |
 |---|---|---|
