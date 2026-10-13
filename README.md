@@ -15,9 +15,11 @@
 
 線上版的格式、音訊來源與儲存能力依瀏覽器而異，快捷鍵需網頁取得焦點。需要全域快捷鍵或桌面版持續寫入磁碟功能，可下載輕量版；需要原生 MP4／MKV／WebM 處理，可使用進階版。
 
-## 下載 Windows 進階測試版 v0.2.0-beta.4
+## 下載 Windows 進階測試版 v0.2.0-beta.5
 
-[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.4-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.4/Screenrecorder-Pro-Advanced-0.2.0-beta.4-Portable.exe)
+[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.5-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.5/Screenrecorder-Pro-Advanced-0.2.0-beta.5-Portable.exe)
+
+新增 H.265／HEVC 軟體編碼：於「錄影進階設定 → 影片編碼」選擇，支援 MP4／MKV 即時錄影、事後轉檔與剪輯輸出，預設仍維持 H.264。WebM 不支援 H.265，MKV 無損封裝保留原編碼。此版尚未啟用 GPU 硬體編碼，即時 H.265 較耗 CPU，也可先錄 WebM 再轉檔；播放器相容性依裝置而異。
 
 內建原生 FFmpeg，支援即時 MP4／MKV／WebM 錄影、錄完轉檔、裁切、分割與音量調整。beta.3 更新應用程式圖示、頁尾版本介紹與 GitHub 連結，外部連結以系統預設瀏覽器開啟。
 
