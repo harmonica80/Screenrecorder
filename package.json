@@ -33,10 +33,13 @@
       "target": [
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "artifactName": "Screenrecorder-Pro-Lite-${version}-Portable.${ext}"
+      "artifactName": "Screenrecorder-Pro-Lite-${version}-Portable.${ext}",
+      "icon": "assets/app-icon.ico"
     },
     "portable": {
       "artifactName": "Screenrecorder-Pro-Lite-${version}-Portable.${ext}"

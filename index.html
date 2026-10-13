@@ -798,6 +798,10 @@
         <span>參考<a href="https://jamespolik.pixnet.net/blog/posts/875565960578027685" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700 hover:underline font-medium transition-colors">小黃老師嘿技術 2026 螢幕錄影工具 Pro</a></span>
         <span class="text-slate-300">|</span>
         <span class="font-medium text-slate-700">述文老師改版</span>
+        <div style="width:100%;margin-top:8px;line-height:1.7">
+          <a href="https://github.com/harmonica80/Screenrecorder" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">GitHub 專案與下載</a><br>
+          提供網頁版、輕量版與進階版三種版本。
+        </div>
         <div id="desktopVersionControls" hidden style="width:100%;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px">
           <span id="desktopVersionLabel"></span>
           <button id="checkUpdatesBtn" type="button" style="border:1px solid #cbd5e1;border-radius:8px;background:white;padding:7px 12px">檢查更新</button>
@@ -1009,7 +1013,7 @@
           if (editorExportBusy) editorStatus.textContent = text;
         });
       }
-      document.getElementById('privacyNotice').innerHTML = '<strong class="text-slate-700">隱私與使用說明：</strong><br>本軟體為 Windows 免安裝錄影工具。螢幕擷取、攝影機合成與音訊混合均在您的電腦上處理；錄影資料持續寫入您選擇的本機資料夾，依版本與設定儲存影片。錄影長度仍受可用磁碟空間與電腦效能影響。<br>' + (isAdvanced ? '進階版可即時儲存 MP4／MKV／WebM；使用先錄 WebM 再轉檔模式時，會保留原始錄影。<br>' : '') + '本軟體不會將錄影畫面或音訊上傳至伺服器。檢查更新會連線至 GitHub；部分選用功能可能需要下載外部資源。錄製內容的使用授權與相關責任，請由使用者自行確認。';
+      document.getElementById('privacyNotice').innerHTML = '<strong class="text-slate-700">隱私與使用說明：</strong><br>本軟體為 Windows 免安裝錄影工具。螢幕擷取、攝影機合成與音訊混合均在您的電腦上處理；錄影資料持續寫入您選擇的本機資料夾，依版本與設定儲存影片。錄影長度仍受可用磁碟空間與電腦效能影響。<br>' + (isAdvanced ? '進階版可選擇儲存影片為 MP4/MKV/WebM 三種格式，使用 MP4/MKV 在進行後續影片的分割與剪輯時，能大幅降低影片轉檔的時間。<br>' : '') + '本軟體不會將錄影畫面或音訊上傳至伺服器。檢查更新會連線至 GitHub；部分選用功能可能需要下載外部資源。錄製內容的使用授權與相關責任，請由使用者自行確認。';
       document.getElementById('openReleasesBtn').addEventListener('click', () => desktopRecorder.openReleases().catch(error => { document.getElementById('updateCheckStatus').textContent = error.message; }));
       document.getElementById('checkUpdatesBtn').addEventListener('click', async event => {
         const button = event.currentTarget;
