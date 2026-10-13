@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 window.addEventListener('error', event => {
   const show = () => {
@@ -17,6 +17,15 @@ window.addEventListener('error', event => {
 
 contextBridge.exposeInMainWorld('desktopRecorderBridge', {
   isDesktop: true,
+  edition: ipcRenderer.sendSync('app:edition'),
+  importVideo: file => ipcRenderer.invoke('media:import', webUtils.getPathForFile(file)),
+  exportNative: options => ipcRenderer.invoke('media:export', options),
+  cancelNative: () => ipcRenderer.invoke('media:cancel'),
+  onNativeProgress: callback => {
+    const listener = (_event, progress) => callback(progress);
+    ipcRenderer.on('media:progress', listener);
+    return () => ipcRenderer.removeListener('media:progress', listener);
+  },
   configureShortcuts: bindings => ipcRenderer.invoke('recording:configure-shortcuts', bindings),
   onShortcut: callback => {
     const listener = (_event, key) => callback(key);

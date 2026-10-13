@@ -310,6 +310,13 @@
           </div>
           <p class="text-xs text-slate-500 mt-2">指定後直接儲存；同名檔案自動加編號，不會覆蓋。</p>
         </div>
+        <div id="advancedOutputSettings" hidden style="padding:12px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff">
+          <p style="font-weight:600;margin-bottom:8px">進階版影片輸出</p>
+          <label>輸出格式 <select id="advancedFormat"><option value="mp4">MP4（H.264／AAC）</option><option value="mkv">MKV（H.264／AAC）</option><option value="webm">WebM（VP9／Opus）</option></select></label>
+          <label style="display:block;margin-top:8px">輸出畫質 <select id="advancedQuality"><option value="balanced">平衡</option><option value="high">高畫質</option><option value="small">較小檔案</option></select></label>
+          <label style="display:block;margin-top:8px"><input id="advancedAutoConvert" type="checkbox" checked> 停止錄影後自動轉為所選格式</label>
+          <p style="font-size:12px;margin-top:8px">錄影先寫入 WebM，完成後以內建引擎轉檔；原始 WebM 會保留，請預留兩份影片的磁碟空間。</p>
+        </div>
         <!-- 錄影檔案命名 -->
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-2">錄影檔案命名</label>
@@ -704,6 +711,7 @@
           <button id="splitAtPlayheadBtn" type="button" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm">在播放頭分割</button>
           <button id="splitVideoBtn" type="button" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm">依指定時間分割</button>
           <button id="exportVolumeBtn" type="button" class="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm">輸出音量調整影片</button>
+          <button id="advancedConvertBtn" type="button" hidden class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">轉換完整影片格式</button>
         </div>
         <label class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">影片輸出方式
           <select id="outputEngineSelect" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700">
@@ -951,6 +959,18 @@
     const desktopRecorder = window.desktopRecorderBridge?.isDesktop ? window.desktopRecorderBridge : null;
     let desktopFinalizing = false;
     let editorExportBusy = false;
+    const isAdvanced = desktopRecorder?.edition === 'advanced';
+    let nativeSourcePath = '';
+    const advancedFormat = document.getElementById('advancedFormat');
+    const advancedQuality = document.getElementById('advancedQuality');
+    const advancedAutoConvert = document.getElementById('advancedAutoConvert');
+    function nativeOptions() { return {format:advancedFormat.value,quality:advancedQuality.value}; }
+    async function nativeExport(options) {
+      const notice = document.getElementById('nativeJobNotice');
+      notice.hidden = false;
+      try { return await desktopRecorder.exportNative({...nativeOptions(),...options}); }
+      finally { notice.hidden = true; }
+    }
     let recordingRegion = null;
     const regionPreview = document.createElement('canvas');
     regionPreview.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none';
@@ -967,7 +987,25 @@
       versionControls.hidden = false;
       versionControls.style.display = 'flex';
       document.getElementById('desktopVersionLabel').textContent = `免安裝輕量版 v${desktopRecorder.version}`;
-      document.getElementById('privacyNotice').innerHTML = '<strong class="text-slate-700">隱私與使用說明：</strong><br>本軟體為 Windows 免安裝錄影工具。螢幕擷取、攝影機合成與音訊混合均在您的電腦上處理；錄影資料持續寫入您選擇的本機資料夾，以 WebM 格式儲存。錄影長度仍受可用磁碟空間與電腦效能影響。<br>本軟體不會將錄影畫面或音訊上傳至伺服器。檢查更新會連線至 GitHub；部分選用功能可能需要下載外部資源。錄製內容的使用授權與相關責任，請由使用者自行確認。';
+      if (isAdvanced) {
+        document.title = `螢幕錄影工具 Pro 進階測試版 ${desktopRecorder.version}`;
+        document.querySelector('h1').textContent = '螢幕錄影工具 Pro 進階測試版';
+        document.getElementById('desktopVersionLabel').textContent = `免安裝進階測試版 v${desktopRecorder.version}`;
+        document.getElementById('advancedOutputSettings').hidden = false;
+        document.getElementById('advancedConvertBtn').hidden = false;
+        const notice = document.createElement('div');
+        notice.id = 'nativeJobNotice'; notice.hidden = true;
+        notice.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:10002;padding:16px;background:#1e293b;color:white;border-radius:12px;box-shadow:0 4px 20px #0005';
+        notice.innerHTML = '<span role="status">影片處理準備中…</span> <button type="button" style="margin-left:12px;border:1px solid white;padding:6px 12px;border-radius:8px">取消處理</button>';
+        notice.querySelector('button').onclick = () => desktopRecorder.cancelNative();
+        document.body.appendChild(notice);
+        desktopRecorder.onNativeProgress(progress => {
+          const text = progress.percent == null ? `影片處理中：已處理 ${Math.round(progress.seconds || 0)} 秒` : `影片處理中：${progress.percent}%`;
+          notice.querySelector('span').textContent = text;
+          if (editorExportBusy) editorStatus.textContent = text;
+        });
+      }
+      document.getElementById('privacyNotice').innerHTML = '<strong class="text-slate-700">隱私與使用說明：</strong><br>本軟體為 Windows 免安裝錄影工具。螢幕擷取、攝影機合成與音訊混合均在您的電腦上處理；錄影資料持續寫入您選擇的本機資料夾，以 WebM 格式儲存。錄影長度仍受可用磁碟空間與電腦效能影響。<br>' + (isAdvanced ? '進階版內建原生 FFmpeg，可在本機轉成 MP4／MKV／WebM，原始錄影會保留。<br>' : '') + '本軟體不會將錄影畫面或音訊上傳至伺服器。檢查更新會連線至 GitHub；部分選用功能可能需要下載外部資源。錄製內容的使用授權與相關責任，請由使用者自行確認。';
       document.getElementById('openReleasesBtn').addEventListener('click', () => desktopRecorder.openReleases().catch(error => { document.getElementById('updateCheckStatus').textContent = error.message; }));
       document.getElementById('checkUpdatesBtn').addEventListener('click', async event => {
         const button = event.currentTarget;
@@ -1032,10 +1070,11 @@
     outputEngineSelect.value = window.recordingPreferences.storage.getItem('screenRecorderOutputEngine') || 'fast';
     outputEngineSelect.addEventListener('change', () => window.recordingPreferences.storage.setItem('screenRecorderOutputEngine', outputEngineSelect.value));
     if (desktopRecorder) {
-      outputEngineSelect.innerHTML = '<option value="compatible">本機輸出（依片段長度播放，直接存檔）</option>';
-      outputEngineSelect.value = 'compatible';
+      outputEngineSelect.innerHTML = isAdvanced ? '<option value="native">原生精準輸出（套用裁切及音量）</option><option value="native-copy">MKV 無損快速封裝（切點依關鍵影格，不套用音量）</option>' : '<option value="compatible">本機輸出（依片段長度播放，直接存檔）</option>';
+      outputEngineSelect.value = isAdvanced ? 'native' : 'compatible';
       outputEngineSelect.parentElement.nextElementSibling.textContent = '輕量版以本機播放重新輸出 WebM，不需下載轉檔引擎。輸出時間接近片段長度；音量節點會套用至輸出影片，完成後可開啟檔案所在資料夾。';
       editorPanel.querySelector('p').textContent = '裁切、分割與音量調整在本機重新輸出影片。';
+      if (isAdvanced) outputEngineSelect.parentElement.nextElementSibling.textContent = '內建原生 FFmpeg，可直接讀取硬碟影片處理，不必播放整段。輸出格式與畫質請在「錄影進階設定」選擇。無損快速封裝只輸出 MKV，且不套用音量節點；精準模式會重新編碼。';
     }
 
     // 重新排列設定：倒數、浮水印置於攝影機上方，子母畫面設定併入攝影機區塊。
@@ -1130,10 +1169,11 @@
       for (const option of encodingPresetSelect.options) option.textContent = labels[option.value];
       if (!encodingPresetSelect.value) encodingPresetSelect.value = 'auto';
       encodingStatus.textContent = '輕量版僅輸出 WebM，目前不提供 MP4 轉檔；不支援的編碼會自動改用可用格式。';
+      if (isAdvanced) encodingStatus.textContent = '此處設定錄影原始 WebM 編碼；MP4／MKV 與成品畫質請在上方「進階版影片輸出」選擇。';
     }
     encodingPresetSelect.addEventListener('change', () => {
       window.recordingPreferences.storage.setItem('screenRecorderEncodingPreset', encodingPresetSelect.value);
-      encodingStatus.textContent = desktopRecorder ? '輕量版僅輸出 WebM，目前不提供 MP4 轉檔。實際編碼將於開始錄影時確認。' : '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
+      encodingStatus.textContent = isAdvanced ? '原始錄影以 WebM 寫入；完成後依上方格式設定轉成 MP4／MKV／WebM。' : desktopRecorder ? '輕量版僅輸出 WebM，目前不提供 MP4 轉檔。實際編碼將於開始錄影時確認。' : '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
     });
 
     function selectRecordingEncoding() {
@@ -2410,6 +2450,14 @@
         }
         try {
           desktopRecordingInfo = await desktopRecorder.finalizeRecording();
+          nativeSourcePath = desktopRecordingInfo.filePath;
+          if (isAdvanced && advancedAutoConvert.checked) {
+            statusText.textContent = '錄影已儲存，正在轉檔…';
+            try {
+              desktopRecordingInfo = await nativeExport({filePath:nativeSourcePath,label:'完成',end:recordedDurationSeconds});
+              nativeSourcePath = desktopRecordingInfo.filePath;
+            } catch (error) { alert(error.message + '\n原始 WebM 錄影已保留：\n' + nativeSourcePath); }
+          }
           desktopPendingPath = '';
           setUIState('finished');
           playbackVideo.onerror = () => updateDesktopSaveStatus('影片已儲存，但播放失敗。請使用「在資料夾中顯示」開啟檔案。', true);
@@ -2421,6 +2469,7 @@
           playbackVideo.src = desktopRecordingInfo.fileUrl;
           playbackVideo.load();
           editorPanel.classList.add('hidden');
+          if (isAdvanced) prepareEditorVideo(desktopRecordingInfo.fileUrl,recordedDurationSeconds,advancedAutoConvert.checked ? `video/${advancedFormat.value}` : 'video/webm');
           downloadLink.removeAttribute('href');
           downloadLink.innerHTML = '<i data-lucide="folder-open" class="w-5 h-5"></i> 在資料夾中顯示';
           updateDesktopSaveStatus(`已儲存：${formatFileSize(desktopRecordingInfo.bytesWritten)} · ${desktopRecordingInfo.filePath}`);
@@ -2681,9 +2730,13 @@
       }, 200);
     }
 
-    editorVideoInput.addEventListener('change', () => {
+    editorVideoInput.addEventListener('change', async () => {
       const file = editorVideoInput.files?.[0];
       if (!file) return;
+      if (isAdvanced) {
+        try { nativeSourcePath = (await desktopRecorder.importVideo(file)).filePath; }
+        catch (error) { editorStatus.textContent = error.message; return; }
+      }
       const url = URL.createObjectURL(file);
       prepareEditorVideo(url, 0, file.type, file);
       downloadSection.classList.add('hidden');
@@ -3126,6 +3179,13 @@
     }
 
     async function renderClip(start, end, label, useVolumeEnvelope = false) {
+      if (isAdvanced) {
+        const copy = outputEngineSelect.value === 'native-copy' && label !== '局部音量調整';
+        const info = await nativeExport({filePath:nativeSourcePath,start,end,label,copy,
+          format:copy ? 'mkv' : advancedFormat.value,
+          volume:useVolumeEnvelope && !copy ? volumeEnvelopePoints.map(p => ({time:p.position*editorVideoDuration,gain:p.gain})) : []});
+        return {desktopFile:info,label};
+      }
       if (desktopRecorder) {
         const info = await window.exportDesktopClip({ url: editorSourceUrl, start, end,
           filename: `${getRecordingBaseName()}_${label}.webm`,
@@ -3312,6 +3372,15 @@
       waveformTrack.style.pointerEvents = '';
       timelineTrack.style.pointerEvents = '';
     }
+    document.getElementById('advancedConvertBtn').addEventListener('click', async () => {
+      if (!isAdvanced || !beginEditorExport()) return;
+      try {
+        const result = await nativeExport({filePath:nativeSourcePath,label:'轉檔'});
+        addEditorDownload({desktopFile:result,label:'轉檔'});
+        editorStatus.textContent = '完整影片轉檔完成，原始影片仍保留。';
+      } catch (error) { editorStatus.textContent = error.message; }
+      finally { endEditorExport(); }
+    });
     exportTrimBtn.addEventListener('click', async () => {
       if (!beginEditorExport()) return;
       try {

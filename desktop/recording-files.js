@@ -39,7 +39,8 @@ async function serveRecording(request, response, filePath) {
     }
     status = 206;
   }
-  const headers = { 'Content-Type': 'video/webm', 'Accept-Ranges': 'bytes', 'Content-Length': Math.max(0, end - start + 1), 'Cache-Control': 'no-store' };
+  const mime = {'.mp4':'video/mp4','.m4v':'video/mp4','.mov':'video/quicktime','.mkv':'video/x-matroska'}[path.extname(filePath).toLowerCase()] || 'video/webm';
+  const headers = { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Content-Length': Math.max(0, end - start + 1), 'Cache-Control': 'no-store' };
   if (status === 206) headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
   response.writeHead(status, headers);
   if (request.method === 'HEAD' || !size) { response.end(); return; }

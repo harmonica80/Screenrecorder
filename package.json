@@ -8,7 +8,9 @@
   "scripts": {
     "start": "electron .",
     "dist:win": "electron-builder --win portable --x64",
-    "pack:win": "electron-builder --win dir --x64"
+    "pack:win": "electron-builder --win dir --x64",
+    "prepare:advanced": "node desktop/fetch-ffmpeg.cjs",
+    "dist:advanced": "electron-builder --config desktop/advanced-builder.json --win portable --x64"
   },
   "devDependencies": {
     "electron": "^39.2.4",

@@ -1,5 +1,12 @@
 const { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, nativeImage, globalShortcut } = require('electron');
 const { createShortcuts } = require('./shortcuts');
+const advancedEdition = require('../package.json').edition === 'advanced';
+const { createNativeMedia } = require('./native-media');
+const nativeMedia = advancedEdition ? createNativeMedia(pathForNativeBinary()) : null;
+function pathForNativeBinary() {
+  const p = require('node:path');
+  return p.join(app.isPackaged ? process.resourcesPath : p.join(__dirname, '..', 'vendor'), 'ffmpeg', 'ffmpeg.exe');
+}
 const { createRecordingIndicator } = require('./recording-indicator');
 const { checkForUpdates, releasesUrl } = require('./updates');
 const http = require('node:http');
@@ -106,9 +113,38 @@ async function closeActiveRecording({ remove = false } = {}) {
 }
 
 function registerRecordingHandlers() {
+  ipcMain.on('app:edition', event => { event.returnValue = advancedEdition ? 'advanced' : 'lite'; });
+  ipcMain.handle('media:import', async (_event, filePath) => {
+    if (!advancedEdition || typeof filePath !== 'string' || !path.isAbsolute(filePath) || !/\.(webm|mp4|mkv|mov|m4v)$/i.test(filePath)) throw new Error('請選擇本機影片檔案。');
+    const stat = await fs.stat(filePath);
+    if (!stat.isFile()) throw new Error('影片檔案無效。');
+    const token = randomUUID(); playableRecordings.set(token,filePath);
+    return { filePath, fileUrl: `${localAppOrigin}/recordings/${token}` };
+  });
+  ipcMain.handle('media:cancel', () => { nativeMedia?.cancel(); });
+  ipcMain.handle('media:export', async (_event, options) => {
+    if (!nativeMedia) throw new Error('此功能需要進階版。');
+    if (activeRecording || nativeMedia.busy) throw new Error('請等候目前錄影或影片處理完成。');
+    if (![...playableRecordings.values()].includes(options?.filePath)) throw new Error('請先載入影片。');
+    const format = options.format;
+    if (!['mp4','mkv','webm'].includes(format)) throw new Error('影片格式無效。');
+    let target = path.join(saveSettings.recordingDirectory || path.dirname(options.filePath), path.parse(options.filePath).name + '_' + String(options.label || '轉檔').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0,40) + '.' + format);
+    if (!saveSettings.recordingDirectory) {
+      const result = await dialog.showSaveDialog(mainWindow,{title:'儲存處理後的影片',defaultPath:target,filters:[{name:format.toUpperCase()+' 影片',extensions:[format]}]});
+      if (result.canceled || !result.filePath) throw new Error('已取消影片處理。');
+      target = result.filePath;
+    }
+    const result = await nativeMedia.export(options.filePath,target,{
+      format, start: options.start || 0, end: options.end == null ? undefined : options.end,
+      quality: options.quality, copy: !!options.copy,
+      volume: Array.isArray(options.volume) ? options.volume.slice(0,500) : []
+    }, progress => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media:progress',progress); });
+    const token = randomUUID(); playableRecordings.set(token,result.filePath);
+    return {...result,fileUrl:`${localAppOrigin}/recordings/${token}`};
+  });
   ipcMain.handle('recording:configure-shortcuts', (_event, bindings) => shortcuts.configure(bindings));
   ipcMain.on('app:version', event => { event.returnValue = app.getVersion(); });
-  ipcMain.handle('app:check-updates', () => checkForUpdates(app.getVersion()));
+  ipcMain.handle('app:check-updates', () => checkForUpdates(app.getVersion(),advancedEdition ? 'advanced' : 'lite'));
   ipcMain.handle('app:open-releases', () => shell.openExternal(releasesUrl));
   ipcMain.on('settings:initial-preferences', event => { event.returnValue = saveSettings.preferences || {}; });
   ipcMain.handle('settings:save-preferences', async (_event, preferences) => {
@@ -161,6 +197,7 @@ function registerRecordingHandlers() {
   });
 
   ipcMain.handle('recording:prepare', async (_event, suggestedName) => {
+    if (nativeMedia?.busy) throw new Error('影片處理中，請完成後再錄影。');
     if (activeRecording) throw new Error('上一段影片仍在儲存，請稍候。');
     if (saveSettings.recordingDirectory) {
       try {
@@ -229,7 +266,7 @@ function createWindow() {
     height: 960,
     minWidth: 1100,
     minHeight: 720,
-    title: '螢幕錄影工具 Pro－輕量版',
+    title: advancedEdition ? '螢幕錄影工具 Pro－進階測試版' : '螢幕錄影工具 Pro－輕量版',
     backgroundColor: '#f8fafc',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -247,7 +284,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  if (process.platform === 'win32') app.setAppUserModelId('tw.shuwen.screenrecorder.lite');
+  if (process.platform === 'win32') app.setAppUserModelId(advancedEdition ? 'tw.shuwen.screenrecorder.advanced' : 'tw.shuwen.screenrecorder.lite');
   saveSettings = await readSettings(settingsPath()).catch(() => ({}));
   registerRecordingHandlers();
   await startLocalAppServer();
@@ -283,6 +320,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', event => {
+  nativeMedia?.cancel();
   shortcuts.clear();
   if (!activeRecording) return;
   event.preventDefault();
