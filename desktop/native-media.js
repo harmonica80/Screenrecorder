@@ -25,10 +25,12 @@ function volumeFilter(points, start, duration) {
 }
 
 function buildArgs(input, output, options) {
-  const { format = 'mp4', start = 0, end, quality = 'balanced', copy = false, volume = [] } = options;
+  const { format = 'mp4', start = 0, end, quality = 'balanced', copy = false, volume = [], codec = 'auto' } = options;
   if (!['mp4','mkv','webm'].includes(format)) throw new Error('輸出格式無效。');
   if (!Number.isFinite(start) || start < 0 || (end != null && (!Number.isFinite(end) || end <= start))) throw new Error('影片時間範圍無效。');
   if (copy && format !== 'mkv') throw new Error('無損快速封裝請選 MKV 格式。');
+  if (!['auto','h264','h265'].includes(codec)) throw new Error('影片編碼無效。');
+  if (format === 'webm' && codec === 'h265') throw new Error('H.265 請選 MP4 或 MKV。');
   const args = ['-hide_banner','-nostdin','-y'];
   if (start) args.push('-ss', String(start));
   args.push('-i',input);
@@ -39,7 +41,11 @@ function buildArgs(input, output, options) {
     const crf = {high:18,balanced:23,small:28}[quality] ?? 23;
     args.push('-vf','pad=ceil(iw/2)*2:ceil(ih/2)*2');
     if (format === 'webm') args.push('-c:v','libvpx-vp9','-crf',String(crf+7),'-b:v','0','-deadline','good','-cpu-used','4','-c:a','libopus');
-    else args.push('-c:v','libx264','-preset','veryfast','-crf',String(crf),'-pix_fmt','yuv420p','-c:a','aac');
+    else {
+      args.push('-c:v',codec === 'h265' ? 'libx265' : 'libx264','-preset','veryfast','-crf',String(codec === 'h265' ? crf+5 : crf),'-pix_fmt','yuv420p','-c:a','aac');
+      if (codec === 'h265') args.push('-x265-params','pools=2:frame-threads=2:log-level=error');
+      if (codec === 'h265' && format === 'mp4') args.push('-tag:v','hvc1');
+    }
     if (volume.length) {
       if (end == null) throw new Error('音量編輯需要指定影片結束時間。');
       args.push('-af',volumeFilter(volume,start,end-start));

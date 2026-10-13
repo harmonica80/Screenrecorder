@@ -20,9 +20,13 @@ test('native engine converts formats, preserves source and names, applies audio 
   assert.equal(fixture.status,0,fixture.stderr?.toString());
   const original = await fs.readFile(input), engine = createNativeMedia(binary);
   try {
-    for (const format of ['mp4','mkv','webm']) {
-      const result = await engine.export(input,path.join(dir,'成品.'+format),{format,start:1,end:3,volume:[{time:0,gain:0},{time:2,gain:0},{time:2.05,gain:100},{time:4,gain:100}]});
+    for (const [format,codec] of [['mp4','auto'],['mkv','auto'],['webm','auto'],['mp4','h265'],['mkv','h265']]) {
+      const result = await engine.export(input,path.join(dir,'成品.'+format),{format,codec,start:1,end:3,volume:[{time:0,gain:0},{time:2,gain:0},{time:2.05,gain:100},{time:4,gain:100}]});
       assert.ok(result.bytesWritten > 1000);
+      if (codec === 'h265') {
+        const info = spawnSync(binary,['-hide_banner','-i',result.filePath],{windowsHide:true});
+        assert.match(info.stderr.toString(),/Video: hevc/);
+      }
       const audio = spawnSync(binary,['-v','error','-i',result.filePath,'-f','f32le','-ac','1','-ar','48000','-'],{windowsHide:true,maxBuffer:2000000});
       assert.equal(audio.status,0,audio.stderr?.toString());
       const rms = (start,end) => {
@@ -34,7 +38,7 @@ test('native engine converts formats, preserves source and names, applies audio 
       assert.ok(seconds>1.8&&seconds<2.2,format+' duration '+seconds);
     }
     const second = await engine.export(input,path.join(dir,'成品.mp4'),{format:'mp4',end:1});
-    assert.match(second.filePath,/\(1\)\.mp4$/);
+    assert.match(second.filePath,/\(2\)\.mp4$/);
     const copy = await engine.export(input,path.join(dir,'無損.mkv'),{format:'mkv',copy:true});
     assert.ok(copy.bytesWritten>1000);
     const canceled = engine.export(input,path.join(dir,'取消.mp4'),{format:'mp4'});

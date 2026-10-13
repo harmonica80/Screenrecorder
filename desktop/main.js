@@ -137,7 +137,7 @@ function registerRecordingHandlers() {
     }
     const result = await nativeMedia.export(options.filePath,target,{
       format, start: options.start || 0, end: options.end == null ? undefined : options.end,
-      quality: options.quality, copy: !!options.copy,
+      quality: options.quality, codec: options.codec, copy: !!options.copy,
       volume: Array.isArray(options.volume) ? options.volume.slice(0,500) : []
     }, progress => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media:progress',progress); });
     const token = randomUUID(); playableRecordings.set(token,result.filePath);
@@ -223,7 +223,7 @@ function registerRecordingHandlers() {
     if (format !== 'webm') {
       await created.handle.close();
       activeRecording.handle = null;
-      activeRecording.live = createLiveRecording(pathForNativeBinary(),created.filePath,{format,quality:options.quality});
+      activeRecording.live = createLiveRecording(pathForNativeBinary(),created.filePath,{format,quality:options.quality,codec:options.codec});
     }
     return {canceled:false,filePath:created.filePath};
   });

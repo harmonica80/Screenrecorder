@@ -2,9 +2,11 @@
 
 適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。
 
-## 下載 Windows 進階測試版 v0.2.0-beta.4
+進階版 beta.5 新增 **H.265／HEVC 軟體編碼**，可搭配 MP4／MKV 即時錄影、錄完轉檔與剪輯輸出。於「錄影進階設定 → 影片編碼」選擇；WebM 不支援 H.265，MKV 無損封裝保留原編碼。預設仍維持 MP4 H.264。H.265 即時編碼較耗 CPU，可改用先錄再轉檔；播放相容性與壓縮效果依內容、設定及裝置而異。
 
-[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.4-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.4/Screenrecorder-Pro-Advanced-0.2.0-beta.4-Portable.exe)
+## 下載 Windows 進階測試版 v0.2.0-beta.5
+
+[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.5-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.5/Screenrecorder-Pro-Advanced-0.2.0-beta.5-Portable.exe)
 
 內建原生 FFmpeg，支援即時 MP4／MKV／WebM 錄影、錄完轉檔、裁切、分割與音量調整。beta.3 更新應用程式圖示、頁尾版本介紹與 GitHub 連結，外部連結以系統預設瀏覽器開啟。
 
@@ -47,7 +49,7 @@ MP4 即時錄影會增加 CPU 負擔。剪輯速度取決於編碼、畫質與�
 4. F9 暫停／繼續，F10 停止。完成後可播放或開啟檔案所在資料夾。
 5. 如需剪輯，使用「載入本機影片剪輯」，調整時間與音量後輸出。
 
-## 進階測試版 0.2.0-beta.4
+## 進階測試版 0.2.0-beta.5
 
 進階版保留輕量版功能，另內建原生 FFmpeg，可選擇 MP4／MKV／WebM 即時錄影（MP4 同步編碼；MKV 直接封裝；WebM 直接寫入），並保留錄影後自動轉檔、原生精準裁切／分割／音量輸出，以及 MKV 無損快速封裝。事後轉檔模式會保留原始錄影，可取消轉檔。即時 MP4 較耗 CPU，停止後等待時間取決於剩餘處理量。
 

@@ -313,10 +313,12 @@
         <div id="advancedOutputSettings" hidden style="padding:12px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff">
           <p style="font-weight:600;margin-bottom:8px">進階版錄影與影片輸出</p>
           <label>錄影方式 <select id="advancedRecordingMode"><option value="direct">即時儲存所選格式（預設）</option><option value="post">先錄 WebM，停止後再轉檔</option></select></label><br>
-          <label>錄影／輸出格式 <select id="advancedFormat"><option value="mp4">MP4（H.264／AAC）</option><option value="mkv">MKV（即時錄影保留原編碼）</option><option value="webm">WebM（即時錄影保留原編碼）</option></select></label>
+          <label>錄影／輸出格式 <select id="advancedFormat"><option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WebM（即時錄影保留原編碼）</option></select></label>
+          <label style="display:block;margin-top:8px">影片編碼 <select id="advancedCodec"><option value="auto">預設（MP4：H.264；MKV 即時：保留原編碼）</option><option value="h264">H.264（相容性佳）</option><option value="h265">H.265／HEVC（節省空間，較耗 CPU）</option></select></label>
+          <p id="advancedCodecHint" style="font-size:12px;margin-top:6px">H.265 使用軟體編碼，支援 MP4／MKV；播放相容性依裝置而異，檔案大小仍取決於內容與畫質。MKV 無損封裝會保留原編碼，不套用此選項。</p>
           <label style="display:block;margin-top:8px">輸出畫質 <select id="advancedQuality"><option value="balanced">平衡</option><option value="high">高畫質</option><option value="small">較小檔案</option></select></label>
           <label style="display:block;margin-top:8px"><input id="advancedAutoConvert" type="checkbox" checked> 使用「先錄 WebM」時，停止後自動轉為所選格式</label>
-          <p style="font-size:12px;margin-top:8px">即時模式直接儲存所選格式：MP4 同步編碼，較耗 CPU；MKV 保留擷取編碼直接封裝；WebM 直接寫入。停止時只需完成剩餘處理。輸出畫質適用 MP4 即時編碼與事後轉檔；MKV／WebM 即時錄影使用下方擷取編碼設定。先錄 WebM 再轉檔會保留原始檔，需兩份磁碟空間。</p>
+          <p style="font-size:12px;margin-top:8px">即時模式直接儲存所選格式：MP4 同步編碼，較耗 CPU；MKV 預設保留擷取編碼，選擇 H.264／H.265 時同步編碼；WebM 直接寫入。停止時只需完成剩餘處理。輸出畫質適用即時重新編碼與事後轉檔；保留原編碼時使用下方擷取設定。先錄 WebM 再轉檔會保留原始檔，需兩份磁碟空間。</p>
         </div>
         <!-- 錄影檔案命名 -->
         <div>
@@ -964,12 +966,16 @@
     const isAdvanced = desktopRecorder?.edition === 'advanced';
     let nativeSourcePath = '';
     const advancedFormat = document.getElementById('advancedFormat');
+    const advancedCodec = document.getElementById('advancedCodec');
+    function updateAdvancedCodec() { advancedCodec.disabled = advancedFormat.value === 'webm'; }
+    advancedFormat.addEventListener('change', updateAdvancedCodec);
+    updateAdvancedCodec();
     const advancedQuality = document.getElementById('advancedQuality');
     const advancedAutoConvert = document.getElementById('advancedAutoConvert');
     const advancedRecordingMode = document.getElementById('advancedRecordingMode');
     let recordingOutput = {format:'webm',convert:false};
     let desktopQueuedBytes = 0;
-    function nativeOptions() { return {format:advancedFormat.value,quality:advancedQuality.value}; }
+    function nativeOptions() { return {format:advancedFormat.value,quality:advancedQuality.value,codec:advancedFormat.value === 'webm' ? 'auto' : advancedCodec.value}; }
     async function nativeExport(options) {
       const notice = document.getElementById('nativeJobNotice');
       notice.hidden = false;
@@ -2174,7 +2180,7 @@
         desktopWriteQueue = Promise.resolve();
         desktopWriteError = null;
         desktopQueuedBytes = 0;
-        recordingOutput = isAdvanced ? {format:advancedRecordingMode.value === 'direct' ? advancedFormat.value : 'webm',convert:advancedRecordingMode.value === 'post' && advancedAutoConvert.checked,outputFormat:advancedFormat.value,quality:advancedQuality.value} : {format:'webm',convert:false};
+        recordingOutput = isAdvanced ? {format:advancedRecordingMode.value === 'direct' ? advancedFormat.value : 'webm',convert:advancedRecordingMode.value === 'post' && advancedAutoConvert.checked,outputFormat:advancedFormat.value,quality:advancedQuality.value,codec:advancedFormat.value === 'webm' ? 'auto' : advancedCodec.value} : {format:'webm',convert:false};
         desktopPendingPath = '';
         isPreparing = true;
         recordingRegion = null;
@@ -2293,7 +2299,7 @@
         encodingStatus.textContent = `實際使用：${encoding.label} · ${encoding.mimeType} · ${(encoding.bitRate / 1000000).toFixed(1)} Mbps${encoding.usedFallback ? '（瀏覽器已自動改用可用格式）' : ''}`;
 
         if (desktopRecorder) {
-          const prepared = await desktopRecorder.prepareRecording({suggestedName:`${getRecordingBaseName()}.${recordingOutput.format}`,format:recordingOutput.format,quality:recordingOutput.quality});
+          const prepared = await desktopRecorder.prepareRecording({suggestedName:`${getRecordingBaseName()}.${recordingOutput.format}`,format:recordingOutput.format,quality:recordingOutput.quality,codec:recordingOutput.codec});
           if (prepared.canceled) {
             const canceledError = new Error('使用者取消選擇儲存位置。');
             canceledError.name = 'AbortError';
@@ -2473,7 +2479,7 @@
           if (isAdvanced && recordingOutput.convert) {
             statusText.textContent = '錄影已儲存，正在轉檔…';
             try {
-              desktopRecordingInfo = await nativeExport({filePath:nativeSourcePath,label:'完成',end:recordedDurationSeconds,format:recordingOutput.outputFormat,quality:recordingOutput.quality});
+              desktopRecordingInfo = await nativeExport({filePath:nativeSourcePath,label:'完成',end:recordedDurationSeconds,format:recordingOutput.outputFormat,quality:recordingOutput.quality,codec:recordingOutput.codec});
               nativeSourcePath = desktopRecordingInfo.filePath;
             } catch (error) { alert(error.message + '\n原始 WebM 錄影已保留：\n' + nativeSourcePath); }
           }

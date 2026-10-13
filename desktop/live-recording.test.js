@@ -18,12 +18,16 @@ test('live MP4 and MKV preserve audio and duration; silent video and failed enco
       const fixture = spawnSync(binary,args,{windowsHide:true});
       assert.equal(fixture.status,0,fixture.stderr?.toString());
       const bytes = await fs.readFile(input);
-      for (const format of ['mp4','mkv']) {
+      for (const [format,codec] of [['mp4','auto'],['mkv','auto'],['mp4','h265'],['mkv','h265']]) {
         const reserved = await createUniqueRecording(dir,`測試.${format}`,format);
         await reserved.handle.close();
-        const live = createLiveRecording(binary,reserved.filePath,{format});
+        const live = createLiveRecording(binary,reserved.filePath,{format,codec});
         for (let offset=0;offset<bytes.length;offset+=8192) await live.append(bytes.subarray(offset,offset+8192));
         assert.ok(await live.finalize()>1000);
+        if (codec === 'h265') {
+          const info = spawnSync(binary,['-hide_banner','-i',reserved.filePath],{windowsHide:true});
+          assert.match(info.stderr.toString(),/Video: hevc/);
+        }
         const decode = spawnSync(binary,['-v','error','-i',reserved.filePath,'-f','null','-'],{windowsHide:true});
         assert.equal(decode.status,0,decode.stderr?.toString());
         if (audio) {
