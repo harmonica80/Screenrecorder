@@ -312,6 +312,11 @@
         </div>
         <div id="advancedOutputSettings" hidden style="padding:12px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff">
           <p style="font-weight:600;margin-bottom:8px">進階版錄影與影片輸出</p>
+          <label style="display:block;margin-bottom:8px">錄影核心 <select id="recordingEngine"><option value="browser">原有相容模式</option><option value="rust">Rust 原生核心（實驗版）</option></select></label>
+          <div id="rustEngineSettings" hidden style="margin:8px 0;padding:8px;background:#fff;border-radius:6px">
+            <label>編碼加速 <select id="rustEncoderMode"><option value="auto">自動偵測硬體編碼，無可用裝置時使用 CPU</option><option value="software">CPU 軟體編碼</option></select></label>
+            <p style="font-size:12px;margin-top:6px">原生模式：螢幕／視窗、MP4／MKV、30 FPS、系統音訊與 Windows 預設麥克風。請關閉內建攝影機與浮水印，並選用即時儲存；框選範圍與 WebM 請使用相容模式。外部攝影機視窗可隨整個螢幕錄入。為降低負擔，錄影時不顯示即時預覽。停止後會合併音訊，影片不再轉碼；暫存音訊可能額外占用約 0.7 GB／小時／立體聲來源（48 kHz）。</p>
+          </div>
           <label>錄影方式 <select id="advancedRecordingMode"><option value="direct">即時儲存所選格式（預設）</option><option value="post">先錄 WebM，停止後再轉檔</option></select></label><br>
           <label>錄影／輸出格式 <select id="advancedFormat"><option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WebM（即時錄影保留原編碼）</option></select></label>
           <label style="display:block;margin-top:8px">影片編碼 <select id="advancedCodec"><option value="auto">預設（MP4：H.264；MKV 即時：保留原編碼）</option><option value="h264">H.264（相容性佳）</option><option value="h265">H.265／HEVC（節省空間，較耗 CPU）</option></select></label>
@@ -973,6 +978,39 @@
     const advancedQuality = document.getElementById('advancedQuality');
     const advancedAutoConvert = document.getElementById('advancedAutoConvert');
     const advancedRecordingMode = document.getElementById('advancedRecordingMode');
+    const recordingEngine = document.getElementById('recordingEngine');
+    let rustRecording = false;
+    let rustPauseBusy = false;
+    let rustSettingsState = null;
+    function lockRustSettings(lock) {
+      if (lock && !rustSettingsState) {
+        rustSettingsState = [...document.querySelectorAll('main > section input, main > section select')].map(el => [el,el.disabled]);
+        for (const [el] of rustSettingsState) el.disabled = true;
+      } else if (!lock && rustSettingsState) {
+        for (const [el,disabled] of rustSettingsState) el.disabled = disabled;
+        rustSettingsState = null;
+      }
+    }
+    const rustNotice = document.createElement('div');
+    rustNotice.hidden = true;
+    rustNotice.style.cssText = 'position:absolute;inset:0;z-index:5;align-content:center;text-align:center;padding:24px;background:#0f172a;color:#e2e8f0';
+    rustNotice.textContent = 'Rust 原生核心直接擷取畫面；停止錄影後可在此播放。';
+    previewContainer.appendChild(rustNotice);
+    recordingEngine.addEventListener('change', () => {
+      const native = recordingEngine.value === 'rust';
+      document.getElementById('rustEngineSettings').hidden = !native;
+      document.getElementById('advancedCodecHint').textContent = native
+        ? '原生模式的預設編碼為 H.264（MP4／MKV）。硬體編碼依裝置偵測結果；CPU 備援不保證即時效能。'
+        : 'H.265 使用軟體編碼，支援 MP4／MKV；播放相容性依裝置而異，檔案大小仍取決於內容與畫質。MKV 無損封裝會保留原編碼，不套用此選項。';
+    });
+    if (isAdvanced) desktopRecorder.onRustEvent(event => {
+      if (event.event === 'progress' && rustRecording) {
+        encodingStatus.textContent = `Rust 原生錄影 · 已錄製 ${Math.floor(event.seconds)} 秒`;
+      }
+      if (event.event === 'warning') { updateDesktopSaveStatus(event.message, true); alert(event.message); }
+      if (event.event === 'finalizing' && rustRecording && isRecording) stopRecording();
+      if (event.event === 'exit' && rustRecording && isRecording) stopRecording();
+    });
     let recordingOutput = {format:'webm',convert:false};
     let desktopQueuedBytes = 0;
     function nativeOptions() { return {format:advancedFormat.value,quality:advancedQuality.value,codec:advancedFormat.value === 'webm' ? 'auto' : advancedCodec.value}; }
@@ -2172,10 +2210,51 @@
       if (isRecording) startCompositeScheduler();
     });
 
+    async function startRustRecording() {
+      if (cameraToggle.checked || watermarkToggle.checked) throw new Error('Rust 原生模式尚未合成內建攝影機或浮水印。請先關閉這兩項，或改用原有相容模式。');
+      if (displaySurfaceMode.value === 'region') throw new Error('Rust 原生模式請選擇整個螢幕或應用程式視窗；自訂範圍請使用相容模式。');
+      if (advancedRecordingMode.value !== 'direct' || advancedFormat.value === 'webm') throw new Error('Rust 原生模式請選擇「即時儲存」及 MP4／MKV。');
+      if (micToggle.checked && micDeviceSelect.value && micDeviceSelect.value !== 'default') throw new Error('Rust 第一版使用 Windows 預設麥克風。請將麥克風選擇改為預設；指定裝置請使用相容模式。');
+      lockRustSettings(true);
+      isPreparing = true;
+      setUIState('preparing');
+      rustNotice.hidden = false;
+      if (!await chooseDesktopCaptureSource(true)) { const error = new Error('已取消選擇來源'); error.name = 'AbortError'; throw error; }
+      const nativeFormat = advancedFormat.value;
+      const prepared = await desktopRecorder.prepareRecording({
+        engine:'rust', suggestedName:`${getRecordingBaseName()}.${advancedFormat.value}`,
+        format:advancedFormat.value, quality:advancedQuality.value, codec:advancedCodec.value,
+        systemAudio:sysAudioToggle.checked, microphone:micToggle.checked,
+        software:document.getElementById('rustEncoderMode').value === 'software'
+      });
+      if (prepared.canceled) { const error = new Error('已取消儲存'); error.name = 'AbortError'; throw error; }
+      desktopPendingPath = prepared.filePath;
+      if (countdownToggle.checked && !await runCountdown()) return;
+      const engine = await desktopRecorder.startRustRecording();
+      rustRecording = true;
+      mediaRecorder = null;
+      recordingOutput = {format:nativeFormat,convert:false};
+      recordingMimeType = `video/${nativeFormat}`;
+      isPreparing = false;
+      isRecording = true;
+      isPaused = false;
+      totalRecordedTime = 0;
+      lastResumeTime = Date.now();
+      recordingStartedAt = new Date();
+      timerInterval = setInterval(updateTimer, 1000);
+      encodingStatus.textContent = `Rust／Windows 原生擷取 · ${engine.encoder} · ${engine.width}×${engine.height} · ${engine.fps} FPS`;
+      setUIState('recording');
+    }
+
     // 啟動錄製流程
     async function startRecording() {
-      if (editorExportBusy || isPreparing || desktopFinalizing || (mediaRecorder && mediaRecorder.state !== 'inactive')) return;
+      if (isRecording || editorExportBusy || isPreparing || desktopFinalizing || (mediaRecorder && mediaRecorder.state !== 'inactive')) return;
       try {
+        desktopWriteQueue = Promise.resolve();
+        desktopWriteError = null;
+        desktopPendingPath = '';
+        if (isAdvanced && recordingEngine.value === 'rust') { await startRustRecording(); return; }
+        rustNotice.hidden = true;
         recordedChunks = [];
         desktopWriteQueue = Promise.resolve();
         desktopWriteError = null;
@@ -2360,6 +2439,9 @@
         setUIState('recording');
 
       } catch (err) {
+        rustRecording = false;
+        lockRustSettings(false);
+        rustNotice.hidden = true;
         console.error("啟動錄影失敗: ", err);
         isRecording = false;
         isPreparing = false;
@@ -2400,6 +2482,8 @@
         countdownCancelled = true;
         isPreparing = false;
         isRecording = false;
+        rustNotice.hidden = true;
+        lockRustSettings(false);
         stopCompositeScheduler();
         countdownOverlay.classList.add('hidden');
         countdownOverlay.classList.remove('flex');
@@ -2419,7 +2503,22 @@
       }
     }
 
-    function togglePause() {
+    async function togglePause() {
+      if (rustRecording) {
+        if (rustPauseBusy || desktopFinalizing) return;
+        rustPauseBusy = true;
+        try {
+          const next = !isPaused;
+          await desktopRecorder.pauseRustRecording(next);
+          if (!isRecording || desktopFinalizing) return;
+          if (next) totalRecordedTime += Date.now() - lastResumeTime;
+          else lastResumeTime = Date.now();
+          isPaused = next;
+          setUIState(next ? 'paused' : 'recording');
+        } catch (error) { alert(error.message); }
+        finally { rustPauseBusy = false; }
+        return;
+      }
       if (!mediaRecorder) return;
       if (mediaRecorder.state === 'recording') {
         if (mediaRecorder.requestData) mediaRecorder.requestData();
@@ -2439,6 +2538,7 @@
     }
 
     function stopRecording() {
+      if (!isRecording || desktopFinalizing) return;
       if (desktopRecorder) desktopRecorder.setRecordingIndicator('idle').catch(() => {});
       if (!isPaused && lastResumeTime) totalRecordedTime += Date.now() - lastResumeTime;
       recordedDurationSeconds = Math.max(0.1, totalRecordedTime / 1000);
@@ -2457,6 +2557,7 @@
         stopBtn.disabled = true;
         statusText.textContent = '正在完成影片儲存…';
       } else setUIState('finished');
+      if (rustRecording) { rustRecording = false; rustNotice.hidden = true; exportVideo(); }
     }
 
     async function exportVideo() {
@@ -2475,6 +2576,7 @@
         }
         try {
           desktopRecordingInfo = await desktopRecorder.finalizeRecording();
+          if (desktopRecordingInfo.seconds) recordedDurationSeconds = desktopRecordingInfo.seconds;
           nativeSourcePath = desktopRecordingInfo.filePath;
           if (isAdvanced && recordingOutput.convert) {
             statusText.textContent = '錄影已儲存，正在轉檔…';
@@ -2506,6 +2608,7 @@
           setUIState('ready');
         } finally {
           desktopFinalizing = false;
+          lockRustSettings(false);
           startBtn.disabled = newRecordBtn.disabled = stopBtn.disabled = false;
         }
         return;
@@ -2551,7 +2654,7 @@
       desktopSaveStatus.className = `text-xs mt-1 break-all ${isError ? 'text-red-600' : 'text-slate-500'}`;
     }
 
-    async function chooseDesktopCaptureSource() {
+    async function chooseDesktopCaptureSource(native = false) {
       if (!desktopRecorder) return true;
       const kind = ['monitor', 'region'].includes(displaySurfaceMode.value) ? 'screen' : 'window';
       return new Promise(resolve => {
@@ -2575,7 +2678,7 @@
         const timeout = setTimeout(() => {
           if (!closed) grid.textContent = '讀取超過 15 秒，請取消後重試。若持續發生，請回報此訊息。';
         }, 15000);
-        desktopRecorder.listCaptureSources(kind).then(sources => {
+        (native ? desktopRecorder.listRustSources(kind) : desktopRecorder.listCaptureSources(kind)).then(sources => {
           clearTimeout(timeout);
           if (closed) return;
           grid.textContent = sources.length ? '' : '找不到可錄製的畫面，請取消並確認目標視窗已開啟。';
@@ -2585,6 +2688,7 @@
           button.type = 'button';
           button.className = 'group overflow-hidden rounded-xl border-2 border-slate-200 bg-white text-left transition hover:border-blue-500 hover:shadow-lg focus:border-blue-600 focus:outline-none';
           button.innerHTML = `<img src="${source.thumbnail}" alt="" class="aspect-video w-full bg-slate-900 object-contain"><span class="block truncate px-3 py-2 text-sm font-medium text-slate-700">${escapeHtml(source.name)}</span>`;
+          if (!source.thumbnail) button.querySelector('img').hidden = true;
           button.querySelector('img').style.cssText = 'display:block;width:100%;height:auto;aspect-ratio:auto;object-fit:contain;background:transparent';
           button.addEventListener('click', async () => {
             try {

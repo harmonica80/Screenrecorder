@@ -12,7 +12,7 @@
   "productName": "螢幕錄影工具Pro進階版",
   "extraMetadata": {
     "name": "screenrecorder-pro-advanced",
-    "version": "0.2.0-beta.5",
+    "version": "0.2.0-beta.6",
     "edition": "advanced"
   },
   "directories": {
@@ -22,6 +22,10 @@
     {
       "from": "vendor/ffmpeg",
       "to": "ffmpeg"
+    },
+    {
+      "from": "vendor/native",
+      "to": "native"
     }
   ],
   "win": {
@@ -33,10 +37,10 @@
         ]
       }
     ],
-    "artifactName": "Screenrecorder-Pro-Advanced-0.2.0-beta.5-Portable.exe",
+    "artifactName": "Screenrecorder-Pro-Advanced-0.2.0-beta.6-Portable.exe",
     "icon": "assets/app-icon.ico"
   },
   "portable": {
-    "artifactName": "Screenrecorder-Pro-Advanced-0.2.0-beta.5-Portable.exe"
+    "artifactName": "Screenrecorder-Pro-Advanced-0.2.0-beta.6-Portable.exe"
   }
 }

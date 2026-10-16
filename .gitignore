@@ -4,3 +4,6 @@ release-*/
 vendor/
 assets/.*
 npm-debug.log*
+
+native-recorder/target/
+native-smoke-output/

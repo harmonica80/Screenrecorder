@@ -41,6 +41,14 @@ contextBridge.exposeInMainWorld('desktopRecorderBridge', {
   getRecordingFolder: () => ipcRenderer.invoke('settings:get-folder'),
   chooseRecordingFolder: () => ipcRenderer.invoke('settings:choose-folder'),
   clearRecordingFolder: () => ipcRenderer.invoke('settings:clear-folder'),
+  listRustSources: kind => ipcRenderer.invoke('capture:rust-sources', kind),
+  startRustRecording: () => ipcRenderer.invoke('recording:rust-start'),
+  pauseRustRecording: value => ipcRenderer.invoke('recording:rust-pause', value),
+  onRustEvent: callback => {
+    const listener = (_event, progress) => callback(progress);
+    ipcRenderer.on('recording:rust-event', listener);
+    return () => ipcRenderer.removeListener('recording:rust-event', listener);
+  },
   listCaptureSources: kind => ipcRenderer.invoke('capture:list-sources', kind),
   selectCaptureSource: selection => ipcRenderer.invoke('capture:select-source', selection),
   prepareRecording: suggestedName => ipcRenderer.invoke('recording:prepare', suggestedName),

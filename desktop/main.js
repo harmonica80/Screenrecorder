@@ -3,6 +3,11 @@ const { createShortcuts } = require('./shortcuts');
 const advancedEdition = require('../package.json').edition === 'advanced';
 const { createNativeMedia } = require('./native-media');
 const { createLiveRecording } = require('./live-recording');
+const { validateRustOptions, listRustSources, createRustRecording } = require('./rust-recorder');
+function pathForRustBinary() {
+  const p = require('node:path');
+  return p.join(app.isPackaged ? process.resourcesPath : p.join(__dirname, '..', 'vendor'), 'native', 'screenrecorder-native.exe');
+}
 const nativeMedia = advancedEdition ? createNativeMedia(pathForNativeBinary()) : null;
 function pathForNativeBinary() {
   const p = require('node:path');
@@ -107,7 +112,7 @@ async function closeActiveRecording({ remove = false } = {}) {
   if (!activeRecording) return;
   const { handle, filePath, live } = activeRecording;
   activeRecording = null;
-  try { if (live) { if (remove) await live.cancel(); else await live.finalize(); } else await handle.close(); } catch (_) {}
+  try { if (live) { if (remove) await live.cancel(); else await live.finalize(); } else if (handle) await handle.close(); } catch (_) {}
   if (remove) {
     try { await fs.unlink(filePath); } catch (_) {}
   }
@@ -174,6 +179,31 @@ function registerRecordingHandlers() {
     await updateSettings({ recordingDirectory: '' });
     return '';
   });
+  ipcMain.handle('capture:rust-sources', async (_event, kind) => {
+    if (!advancedEdition || process.platform !== 'win32') throw new Error('原生核心需要 Windows 進階版。');
+    const sources = await listRustSources(pathForRustBinary(), kind);
+    if (kind !== 'screen') {
+      const thumbnails = await desktopCapturer.getSources({types:['window'],thumbnailSize:{width:320,height:180}});
+      for (const source of sources) {
+        const match = thumbnails.find(item => item.id.split(':')[1] === source.id.split(':')[1]);
+        if (match) source.thumbnail = match.thumbnail.toDataURL();
+      }
+    }
+    return sources;
+  });
+  ipcMain.handle('recording:rust-start', async () => {
+    if (!activeRecording?.rustOptions || activeRecording.live) throw new Error('原生錄影尚未準備完成。');
+    const recording = activeRecording;
+    recording.live = createRustRecording(pathForRustBinary(), pathForNativeBinary(), recording.filePath, recording.rustOptions, event => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('recording:rust-event',event);
+    });
+    try { return await recording.live.ready; }
+    catch (error) { await closeActiveRecording(); throw error; }
+  });
+  ipcMain.handle('recording:rust-pause', async (_event, value) => {
+    if (!activeRecording?.rustOptions || !activeRecording.live) throw new Error('原生錄影尚未開始。');
+    await activeRecording.live.pause(!!value);
+  });
   ipcMain.handle('capture:list-sources', async (_event, kind) => {
     const types = kind === 'screen' ? ['screen'] : ['window'];
     const sources = await desktopCapturer.getSources({
@@ -204,6 +234,13 @@ function registerRecordingHandlers() {
     const format = advancedEdition ? (options.format || 'webm') : 'webm';
     if (!['mp4','mkv','webm'].includes(format)) throw new Error('錄影格式無效。');
     if (format !== 'webm') await fs.access(pathForNativeBinary());
+    let rustOptions = null;
+    if (options.engine === 'rust') {
+      if (!advancedEdition || process.platform !== 'win32') throw new Error('原生核心需要 Windows 進階版。');
+      await fs.access(pathForRustBinary());
+      rustOptions = validateRustOptions({...options,source:selectedCapture?.id});
+      selectedCapture = null;
+    }
     const name = safeSuggestedName(options.suggestedName, format);
     let created;
     if (saveSettings.recordingDirectory) {
@@ -219,8 +256,10 @@ function registerRecordingHandlers() {
       const filePath = result.filePath.toLowerCase().endsWith(`.${format}`) ? result.filePath : `${result.filePath}.${format}`;
       created = {filePath,handle:await fs.open(filePath,'w')};
     }
-    activeRecording = {...created,bytesWritten:0,format};
-    if (format !== 'webm') {
+    activeRecording = {...created,bytesWritten:0,format,rustOptions};
+    if (rustOptions) {
+      await created.handle.close(); activeRecording.handle = null;
+    } else if (format !== 'webm') {
       await created.handle.close();
       activeRecording.handle = null;
       activeRecording.live = createLiveRecording(pathForNativeBinary(),created.filePath,{format,quality:options.quality,codec:options.codec});
@@ -230,6 +269,7 @@ function registerRecordingHandlers() {
 
   ipcMain.handle('recording:append', async (_event, arrayBuffer) => {
     if (!activeRecording) throw new Error('錄影檔尚未建立。');
+    if (activeRecording.rustOptions) throw new Error('原生模式不接受瀏覽器畫面資料。');
     const buffer = Buffer.from(arrayBuffer);
     if (activeRecording.live) {
       activeRecording.bytesWritten = await activeRecording.live.append(buffer);
@@ -255,7 +295,7 @@ function registerRecordingHandlers() {
     } finally { activeRecording = null; }
     const token = randomUUID();
     playableRecordings.set(token, filePath);
-    return { filePath, fileUrl: `${localAppOrigin}/recordings/${token}`, bytesWritten, format };
+    return { filePath, fileUrl: `${localAppOrigin}/recordings/${token}`, bytesWritten, format, seconds:live?.result?.seconds };
   });
 
   ipcMain.handle('recording:cancel', async () => {
@@ -307,7 +347,7 @@ function createWindow() {
       openExternalLink(url);
     }
   });
-  mainWindow.webContents.on('render-process-gone', () => { recordingIndicator.dispose(); shortcuts.clear(); });
+  mainWindow.webContents.on('render-process-gone', () => { recordingIndicator.dispose(); shortcuts.clear(); closeActiveRecording().catch(console.error); });
   mainWindow.loadURL(`${localAppOrigin}/index.html`);
   mainWindow.on('closed', () => { recordingIndicator.dispose(); shortcuts.clear(); mainWindow = null; });
 }

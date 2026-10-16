@@ -14,16 +14,31 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Test native timeline and compile Windows capture core
+        run: |
+          cargo test --locked --manifest-path native-recorder/Cargo.toml
+          Push-Location native-recorder
+          cargo build --locked --release --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          New-Item -ItemType Directory -Force vendor/native
+          Copy-Item native-recorder/target/x86_64-pc-windows-msvc/release/screenrecorder-native.exe vendor/native/
+          & vendor/native/screenrecorder-native.exe --version
       - run: npm ci
       - run: npm run prepare:advanced
       - run: node --test desktop/*.test.js
+      - name: Native Windows capture smoke test
+        timeout-minutes: 4
+        run: node desktop/native-smoke.cjs
       - run: npm run dist:advanced -- --publish never
         env:
           ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
         with:
-          name: Screenrecorder-Pro-Advanced-0.2.0-beta.5
+          name: Screenrecorder-Pro-Advanced-0.2.0-beta.6
           path: release-advanced/*.exe
           retention-days: 14
       - uses: actions/github-script@v7
