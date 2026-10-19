@@ -15,11 +15,13 @@
 
 線上版的格式、音訊來源與儲存能力依瀏覽器而異，快捷鍵需網頁取得焦點。需要全域快捷鍵或桌面版持續寫入磁碟功能，可下載輕量版；需要原生 MP4／MKV／WebM 處理，可使用進階版。
 
-## 下載 Windows 進階測試版 v0.2.0-beta.6
+## 下載 Windows 進階測試版 v0.2.0-beta.7
 
-[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.6-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.6/Screenrecorder-Pro-Advanced-0.2.0-beta.6-Portable.exe)
+[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.7-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.7/Screenrecorder-Pro-Advanced-0.2.0-beta.7-Portable.exe)
 
-新增 **Rust 原生錄影核心（實驗版）**，保留現有介面、快捷鍵、播放與剪輯。於「錄影進階設定 → 錄影核心」切換；預設仍使用原有相容模式。
+錄影前倒數新增 **1 秒與 2 秒**，可選 1、2、3、5、10 秒，預設仍為 **3 秒**；啟用記住設定時會保留上次選擇。
+
+提供 **Rust 原生錄影核心（實驗版）**，保留現有介面、快捷鍵、播放與剪輯。於「錄影進階設定 → 錄影核心」切換；預設仍使用原有相容模式。
 
 - 原生 Windows 畫面擷取：螢幕／應用程式視窗、固定 30 FPS、MP4／MKV、H.264／H.265。
 - 探測 NVENC／QSV／AMF 硬體編碼，無可用裝置時使用 CPU，也可手動選 CPU。畫面顯示實際使用的編碼器。
@@ -30,7 +32,7 @@
 
 已通過 Windows 原生桌面擷取、暫停／繼續、MP4 封裝與完整解碼測試。系統音訊、麥克風、硬體編碼及長時間同步仍需實機驗證；目前仍有 GPU 到 CPU 的畫面讀回，不保證固定效能提升或能修復外部攝影機工具本身的掉格。
 
-[原生核心技術與建置說明](https://github.com/harmonica80/Screenrecorder/blob/advanced-preview/native-recorder/README.md) · [完整版本說明](https://github.com/harmonica80/Screenrecorder/releases/tag/advanced-v0.2.0-beta.6)
+[原生核心技術與建置說明](https://github.com/harmonica80/Screenrecorder/blob/advanced-preview/native-recorder/README.md) · [完整版本說明](https://github.com/harmonica80/Screenrecorder/releases/tag/advanced-v0.2.0-beta.7)
 
 原有相容模式與 FFmpeg 剪輯功能保留，支援 MP4／MKV／WebM、事後轉檔、裁切、分割與音量調整。H.265 支援 MP4／MKV；WebM 不支援 H.265，MKV 無損封裝保留原編碼。精準裁切與音量調整仍需重新編碼，MKV 無損封裝則可避免重新編碼。
 
