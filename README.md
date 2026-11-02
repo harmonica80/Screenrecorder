@@ -2,7 +2,7 @@
 
 適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。
 
-**授權：** 網站說明與介面文字採用 [創用 CC 姓名標示-非商業性-相同方式分享 4.0 國際（CC BY-NC-SA 4.0）](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)。程式原始碼仍依專案既有 MIT 授權。
+**授權：** 本程式採用 [創用 CC 姓名標示-非商業性-相同方式分享 4.0 國際（CC BY-NC-SA 4.0）](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)。程式原始碼仍依專案既有 MIT 授權。
 
 ## Screenrecorder 螢幕錄影工具線上版
 
