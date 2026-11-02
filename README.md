@@ -2,6 +2,8 @@
 
 適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。
 
+**授權：** 網站說明與介面文字採用 [創用 CC 姓名標示-非商業性-相同方式分享 4.0 國際（CC BY-NC-SA 4.0）](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)。程式原始碼仍依專案既有 MIT 授權。
+
 ## Screenrecorder 螢幕錄影工具線上版
 
 **[立即開啟線上版](https://harmonica80.github.io/Screenrecorder/)**
@@ -15,9 +17,9 @@
 
 線上版的格式、音訊來源與儲存能力依瀏覽器而異，快捷鍵需網頁取得焦點。需要全域快捷鍵或桌面版持續寫入磁碟功能，可下載輕量版；需要原生 MP4／MKV／WebM 處理，可使用進階版。
 
-## 下載 Windows 進階測試版 v0.2.0-beta.7
+## 下載 Windows 進階測試版 v0.2.0-beta.8
 
-[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.7-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.7/Screenrecorder-Pro-Advanced-0.2.0-beta.7-Portable.exe)
+[下載 Screenrecorder-Pro-Advanced-0.2.0-beta.8-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/advanced-v0.2.0-beta.8/Screenrecorder-Pro-Advanced-0.2.0-beta.8-Portable.exe)
 
 錄影前倒數新增 **1 秒與 2 秒**，可選 1、2、3、5、10 秒，預設仍為 **3 秒**；啟用記住設定時會保留上次選擇。
 
@@ -32,13 +34,13 @@
 
 已通過 Windows 原生桌面擷取、暫停／繼續、MP4 封裝與完整解碼測試。系統音訊、麥克風、硬體編碼及長時間同步仍需實機驗證；目前仍有 GPU 到 CPU 的畫面讀回，不保證固定效能提升或能修復外部攝影機工具本身的掉格。
 
-[原生核心技術與建置說明](https://github.com/harmonica80/Screenrecorder/blob/advanced-preview/native-recorder/README.md) · [完整版本說明](https://github.com/harmonica80/Screenrecorder/releases/tag/advanced-v0.2.0-beta.7)
+[原生核心技術與建置說明](https://github.com/harmonica80/Screenrecorder/blob/advanced-preview/native-recorder/README.md) · [完整版本說明](https://github.com/harmonica80/Screenrecorder/releases/tag/advanced-v0.2.0-beta.8)
 
 原有相容模式與 FFmpeg 剪輯功能保留，支援 MP4／MKV／WebM、事後轉檔、裁切、分割與音量調整。H.265 支援 MP4／MKV；WebM 不支援 H.265，MKV 無損封裝保留原編碼。精準裁切與音量調整仍需重新編碼，MKV 無損封裝則可避免重新編碼。
 
-## 下載 Windows 輕量版 v0.1.7
+## 下載 Windows 輕量版 v0.1.8
 
-[下載 Screenrecorder-Pro-Lite-0.1.7-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/v0.1.7/Screenrecorder-Pro-Lite-0.1.7-Portable.exe)
+[下載 Screenrecorder-Pro-Lite-0.1.8-Portable.exe](https://github.com/harmonica80/Screenrecorder/releases/download/v0.1.8/Screenrecorder-Pro-Lite-0.1.8-Portable.exe)
 
 [所有版本與更新說明](https://github.com/harmonica80/Screenrecorder/releases)
 

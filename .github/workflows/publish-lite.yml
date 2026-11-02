@@ -1,9 +1,9 @@
 name: Publish Windows Lite
-# v0.1.7: compact footer
+# v0.1.8: CC license footer
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/publish-lite.yml']
+    paths: ['.github/workflows/publish-lite.yml', 'index.html', 'package.json', 'desktop/RELEASE-LITE.md']
   workflow_dispatch:
 permissions:
   contents: write
