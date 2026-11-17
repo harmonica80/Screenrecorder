@@ -956,7 +956,7 @@
     const regionPreview = document.createElement('canvas');
     regionPreview.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none';
     previewVideo.after(regionPreview);
-    if (desktopRecorder) {
+    let latestReleaseUrl = '';\n    if (desktopRecorder) {
       document.documentElement.classList.add('desktop-mode');
       document.title = `螢幕錄影工具 Pro 輕量版 ${desktopRecorder.version}`;
       document.querySelector('h1').textContent = '螢幕錄影工具 Pro 輕量版';
@@ -969,7 +969,7 @@
       versionControls.style.display = 'flex';
       document.getElementById('desktopVersionLabel').textContent = `免安裝輕量版 v${desktopRecorder.version}`;
       document.getElementById('privacyNotice').innerHTML = '<strong class="text-slate-700">隱私與使用說明：</strong><br>本軟體為 Windows 免安裝錄影工具。螢幕擷取、攝影機合成與音訊混合均在您的電腦上處理；錄影資料持續寫入您選擇的本機資料夾，以 WebM 格式儲存。錄影長度仍受可用磁碟空間與電腦效能影響。<br>本軟體不會將錄影畫面或音訊上傳至伺服器。檢查更新會連線至 GitHub；部分選用功能可能需要下載外部資源。錄製內容的使用授權與相關責任，請由使用者自行確認。';
-      document.getElementById('openReleasesBtn').addEventListener('click', () => desktopRecorder.openReleases().catch(error => { document.getElementById('updateCheckStatus').textContent = error.message; }));
+      document.getElementById('openReleasesBtn').addEventListener('click', () => desktopRecorder.openReleases(latestReleaseUrl).catch(error => { document.getElementById('updateCheckStatus').textContent = error.message; }));
       document.getElementById('checkUpdatesBtn').addEventListener('click', async event => {
         const button = event.currentTarget;
         const status = document.getElementById('updateCheckStatus');
@@ -979,8 +979,8 @@
         status.textContent = '正在檢查新版本…';
         try {
           const result = await desktopRecorder.checkForUpdates();
-          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? '尚無公開發布的輕量版版本，暫時無法比對更新。' : `目前 v${result.currentVersion} 已是最新可用版本。`;
-          downloadButton.hidden = result.status !== 'available';
+          latestReleaseUrl = result.status === 'available' ? result.releaseUrl || '' : '';\n          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? '尚無公開發布的輕量版版本，暫時無法比對更新。' : `目前 v${result.currentVersion} 已是最新可用版本。`;
+          downloadButton.hidden = !latestReleaseUrl;
         } catch (error) { status.textContent = '檢查更新失敗，請確認網路後重試。' + error.message; }
         finally { button.disabled = false; }
       });
