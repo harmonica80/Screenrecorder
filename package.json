@@ -1,48 +1,17 @@
 {
-  "name": "screenrecorder-pro-lite",
-  "version": "0.1.5",
-  "description": "螢幕錄影工具 Pro Windows 免安裝輕量版",
+  "name": "screenrecorder-pro-advanced",
+  "version": "0.2.0-beta.11",
+  "description": "螢幕錄影工具 Pro Windows 免安裝進階版",
   "main": "desktop/main.js",
   "author": "述文老師",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win portable --x64",
-    "pack:win": "electron-builder --win dir --x64",
     "prepare:advanced": "node desktop/fetch-ffmpeg.cjs",
     "dist:advanced": "electron-builder --config desktop/advanced-builder.json --win portable --x64"
   },
   "devDependencies": {
     "electron": "^39.2.4",
     "electron-builder": "^26.0.12"
-  },
-  "build": {
-    "appId": "tw.shuwen.screenrecorder.lite",
-    "productName": "螢幕錄影工具Pro輕量版",
-    "asar": true,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "index.html",
-      "assets/**/*",
-      "desktop/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "Screenrecorder-Pro-Lite-${version}-Portable.${ext}",
-      "icon": "assets/app-icon.ico"
-    },
-    "portable": {
-      "artifactName": "Screenrecorder-Pro-Lite-${version}-Portable.${ext}"
-    }
   }
 }

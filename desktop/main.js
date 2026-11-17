@@ -1,6 +1,6 @@
 const { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, nativeImage, globalShortcut } = require('electron');
 const { createShortcuts } = require('./shortcuts');
-const advancedEdition = require('../package.json').edition === 'advanced';
+const advancedEdition = true; // This branch only builds the Windows Advanced edition.
 const { createNativeMedia } = require('./native-media');
 const { createLiveRecording } = require('./live-recording');
 const { validateRustOptions, listRustSources, createRustRecording } = require('./rust-recorder');

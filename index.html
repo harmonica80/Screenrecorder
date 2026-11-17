@@ -805,7 +805,7 @@
         <span>參考<a href="https://jamespolik.pixnet.net/blog/posts/875565960578027685" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700 hover:underline font-medium transition-colors">小黃老師嘿技術 2026 螢幕錄影工具 Pro</a></span>
         <span class="text-slate-300">|</span>
         <span class="font-medium text-slate-700">述文老師改版</span>
-        <div style="width:100%;margin-top:8px;line-height:1.7;white-space:nowrap"><a href="https://github.com/harmonica80/Screenrecorder" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">GitHub 專案與下載</a>：提供網頁版、輕量版與進階版三種版本。</div>
+        <div style="width:100%;margin-top:8px;line-height:1.7;white-space:nowrap"><a href="https://github.com/harmonica80/Screenrecorder" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">GitHub 專案與下載</a>：提供網頁版與進階版兩種版本。</div>
         <div id="desktopVersionControls" hidden style="width:100%;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px">
           <span id="desktopVersionLabel"></span>
           <button id="checkUpdatesBtn" type="button" style="border:1px solid #cbd5e1;border-radius:8px;background:white;padding:7px 12px">檢查更新</button>
@@ -968,7 +968,7 @@
     const desktopRecorder = window.desktopRecorderBridge?.isDesktop ? window.desktopRecorderBridge : null;
     let desktopFinalizing = false;
     let editorExportBusy = false;
-    const isAdvanced = desktopRecorder?.edition === 'advanced';
+    const isAdvanced = Boolean(desktopRecorder);
     let nativeSourcePath = '';
     const advancedFormat = document.getElementById('advancedFormat');
     const advancedCodec = document.getElementById('advancedCodec');
@@ -1024,10 +1024,11 @@
     const regionPreview = document.createElement('canvas');
     regionPreview.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none';
     previewVideo.after(regionPreview);
-    let latestReleaseUrl = '';\n    if (desktopRecorder) {
+    let latestReleaseUrl = '';
+    if (desktopRecorder) {
       document.documentElement.classList.add('desktop-mode');
-      document.title = `螢幕錄影工具 Pro 輕量版 ${desktopRecorder.version}`;
-      document.querySelector('h1').textContent = '螢幕錄影工具 Pro 輕量版';
+      document.title = `螢幕錄影工具 Pro 進階測試版 ${desktopRecorder.version}`;
+      document.querySelector('h1').textContent = '螢幕錄影工具 Pro 進階測試版';
       const regionOption = displaySurfaceMode.querySelector('option[value="browser"]');
       regionOption.value = 'region';
       regionOption.textContent = '▧ 自訂錄影範圍（拖曳框選）';
@@ -1035,7 +1036,7 @@
       const versionControls = document.getElementById('desktopVersionControls');
       versionControls.hidden = false;
       versionControls.style.display = 'flex';
-      document.getElementById('desktopVersionLabel').textContent = `免安裝輕量版 v${desktopRecorder.version}`;
+      document.getElementById('desktopVersionLabel').textContent = `免安裝進階測試版 v${desktopRecorder.version}`;
       if (isAdvanced) {
         document.title = `螢幕錄影工具 Pro 進階測試版 ${desktopRecorder.version}`;
         document.querySelector('h1').textContent = '螢幕錄影工具 Pro 進階測試版';
@@ -1065,7 +1066,7 @@
         status.textContent = '正在檢查新版本…';
         try {
           const result = await desktopRecorder.checkForUpdates();
-          latestReleaseUrl = result.status === 'available' ? result.releaseUrl || '' : '';\n          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? `尚無公開發布的${isAdvanced ? '進階版' : '輕量版'}版本，暫時無法比對更新。` : `目前 v${result.currentVersion} 已是最新可用版本。`;
+          latestReleaseUrl = result.status === 'available' ? result.releaseUrl || '' : '';\n          status.textContent = result.status === 'available' ? `發現新版本 v${result.latestVersion}，可前往下載頁更新。` : result.status === 'unpublished' ? '尚無公開發布的進階版版本，暫時無法比對更新。' : `目前 v${result.currentVersion} 已是最新可用版本。`;
           downloadButton.hidden = !latestReleaseUrl;
         } catch (error) { status.textContent = '檢查更新失敗，請確認網路後重試。' + error.message; }
         finally { button.disabled = false; }
@@ -1121,7 +1122,7 @@
     if (desktopRecorder) {
       outputEngineSelect.innerHTML = isAdvanced ? '<option value="native">原生精準輸出（套用裁切及音量）</option><option value="native-copy">MKV 無損快速封裝（切點依關鍵影格，不套用音量）</option>' : '<option value="compatible">本機輸出（依片段長度播放，直接存檔）</option>';
       outputEngineSelect.value = isAdvanced ? 'native' : 'compatible';
-      outputEngineSelect.parentElement.nextElementSibling.textContent = '輕量版以本機播放重新輸出 WebM，不需下載轉檔引擎。輸出時間接近片段長度；音量節點會套用至輸出影片，完成後可開啟檔案所在資料夾。';
+      outputEngineSelect.parentElement.nextElementSibling.textContent = '進階版使用內建 FFmpeg 或原生核心處理影片，輸出格式依進階設定選擇。';
       editorPanel.querySelector('p').textContent = '裁切、分割與音量調整在本機重新輸出影片。';
       if (isAdvanced) outputEngineSelect.parentElement.nextElementSibling.textContent = '內建原生 FFmpeg，可直接讀取硬碟影片處理，不必播放整段。輸出格式與畫質請在「錄影進階設定」選擇。無損快速封裝只輸出 MKV，且不套用音量節點；精準模式會重新編碼。';
     }
@@ -1217,12 +1218,12 @@
       };
       for (const option of encodingPresetSelect.options) option.textContent = labels[option.value];
       if (!encodingPresetSelect.value) encodingPresetSelect.value = 'auto';
-      encodingStatus.textContent = '輕量版僅輸出 WebM，目前不提供 MP4 轉檔；不支援的編碼會自動改用可用格式。';
+      encodingStatus.textContent = '進階版錄影格式依上方設定與編碼器支援狀況處理。';
       if (isAdvanced) encodingStatus.textContent = '此處設定擷取編碼；即時 MP4 使用 VP8 擷取並同步編成 H.264／AAC。即時 MKV 保留擷取編碼。';
     }
     encodingPresetSelect.addEventListener('change', () => {
       window.recordingPreferences.storage.setItem('screenRecorderEncodingPreset', encodingPresetSelect.value);
-      encodingStatus.textContent = isAdvanced ? '可在上方選擇即時儲存 MP4／MKV／WebM，或錄完後再轉檔。' : desktopRecorder ? '輕量版僅輸出 WebM，目前不提供 MP4 轉檔。實際編碼將於開始錄影時確認。' : '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
+      encodingStatus.textContent = isAdvanced ? '可在上方選擇即時儲存 MP4／MKV／WebM，或錄完後再轉檔。' : desktopRecorder ? '進階版錄影格式依上方設定與編碼器支援狀況處理。' : '實際編碼格式會在開始錄影時依瀏覽器能力確認。';
     });
 
     function selectRecordingEncoding() {
