@@ -789,7 +789,7 @@
         <span>參考<a href="https://jamespolik.pixnet.net/blog/posts/875565960578027685" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-700 hover:underline font-medium transition-colors">小黃老師嘿技術 2026 螢幕錄影工具 Pro</a></span>
         <span class="text-slate-300">|</span>
         <span class="font-medium text-slate-700">述文老師改版</span>
-        <div style="width:100%;margin-top:8px;line-height:1.7;white-space:nowrap"><a href="https://github.com/harmonica80/Screenrecorder" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">GitHub 專案與下載</a>：提供網頁版、輕量版與進階版三種版本。</div>
+        <div style="width:100%;margin-top:8px;line-height:1.7;white-space:nowrap"><a href="https://github.com/harmonica80/Screenrecorder" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">GitHub 專案與下載</a>：提供網頁版與進階版兩種版本。</div>
         <div id="desktopVersionControls" hidden style="width:100%;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px">
           <span id="desktopVersionLabel"></span>
           <button id="checkUpdatesBtn" type="button" style="border:1px solid #cbd5e1;border-radius:8px;background:white;padding:7px 12px">檢查更新</button>
@@ -956,7 +956,8 @@
     const regionPreview = document.createElement('canvas');
     regionPreview.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none';
     previewVideo.after(regionPreview);
-    let latestReleaseUrl = '';\n    if (desktopRecorder) {
+    let latestReleaseUrl = '';
+    if (desktopRecorder) {
       document.documentElement.classList.add('desktop-mode');
       document.title = `螢幕錄影工具 Pro 輕量版 ${desktopRecorder.version}`;
       document.querySelector('h1').textContent = '螢幕錄影工具 Pro 輕量版';
