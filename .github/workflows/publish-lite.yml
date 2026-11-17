@@ -1,5 +1,5 @@
 name: Publish Windows Lite
-# v0.1.9: remove CC footer
+# v0.1.10: remove CC footer and warn before closing with a recording
 on:
   push:
     branches: [main]

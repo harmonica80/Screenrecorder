@@ -3388,6 +3388,14 @@
       await startRecording();
     }
 
+    if (!desktopRecorder) {
+      window.addEventListener('beforeunload', event => {
+        if (!recordingDownloadBlob) return;
+        event.preventDefault();
+        event.returnValue = '請確認錄影影片是否已下載儲存';
+      });
+    }
+
     // 事件綁定
     startBtn.addEventListener('click', beginNextRecording);
     cancelCountdownBtn.addEventListener('click', cancelPendingOrActiveRecording);
