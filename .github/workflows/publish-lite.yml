@@ -1,5 +1,5 @@
 name: Publish Windows Lite
-# v0.1.8: CC license footer
+# v0.1.9: remove CC footer
 on:
   push:
     branches: [main]
