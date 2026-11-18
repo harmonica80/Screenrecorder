@@ -1,0 +1,40 @@
+name: Publish Windows Lite
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-lite.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --test desktop/*.test.js
+      - run: npm run dist:win -- --publish never
+        env:
+          ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const version = JSON.parse(fs.readFileSync('package.json')).version;
+            const tag = `v${version}`;
+            const name = `Screenrecorder-Pro-Lite-${version}-Portable.exe`;
+            const body = fs.readFileSync('desktop/RELEASE-LITE.md', 'utf8');
+            const release = await github.rest.repos.createRelease({
+              ...context.repo, tag_name: tag, target_commitish: context.sha,
+              name: `螢幕錄影工具 Pro 輕量版 ${version}`, body, draft: true, prerelease: false
+            });
+            await github.rest.repos.uploadReleaseAsset({
+              ...context.repo, release_id: release.data.id, name,
+              data: fs.readFileSync(`release/${name}`)
+            });
+            await github.rest.repos.updateRelease({...context.repo, release_id:release.data.id, draft:false});

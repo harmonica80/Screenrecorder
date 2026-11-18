@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld('desktopRecorderBridge', {
   },
   version: ipcRenderer.sendSync('app:version'),
   checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
-  openReleases: url => ipcRenderer.invoke('app:open-releases', url),
+  openReleases: () => ipcRenderer.invoke('app:open-releases'),
   initialPreferences: ipcRenderer.sendSync('settings:initial-preferences'),
   savePreferences: preferences => ipcRenderer.invoke('settings:save-preferences', preferences),
   setRecordingIndicator: state => ipcRenderer.invoke('recording:indicator', state),

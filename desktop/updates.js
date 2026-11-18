@@ -3,27 +3,23 @@ const releasesUrl = 'https://github.com/harmonica80/Screenrecorder/releases';
 function findUpdate(releases, currentVersion, edition = 'lite') {
   const parse = value => {
     const match = /^(?:advanced-)?v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$/.exec(value);
-    return match ? [...match.slice(1, 4).map(Number), match[4] == null ? 1000000 : Number(match[4])] : null;
+    return match ? [...match.slice(1,4).map(Number),match[4] == null ? 1000000 : Number(match[4])] : null;
   };
   const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3];
   const current = parse(currentVersion);
   if (!current) throw new Error('無法辨識目前版本');
-  const asset = edition === 'advanced'
-    ? /^Screenrecorder-Pro-Advanced-.*-Portable\.exe$/i
-    : /^Screenrecorder-Pro-Lite-.*-Portable\.exe$/i;
-  const candidates = releases.filter(r => !r.draft && (edition === 'advanced' || !r.prerelease) &&
-    parse(r.tag_name) && r.assets?.some(a => asset.test(a.name)));
+  const asset = edition === 'advanced' ? /^Screenrecorder-Pro-Advanced-.*-Portable\.exe$/i : /^Screenrecorder-Pro-Lite-.*-Portable\.exe$/i;
+  const candidates = releases.filter(r => !r.draft && (edition === 'advanced' || !r.prerelease) && parse(r.tag_name) &&
+    r.assets?.some(a => asset.test(a.name)));
   candidates.sort((a, b) => compare(parse(b.tag_name), parse(a.tag_name)));
   if (!candidates.length) return { status: 'unpublished', currentVersion, releasesUrl };
-  const latest = candidates[0];
-  const latestVersion = latest.tag_name.replace(/^(?:advanced-)?v/, '');
-  const releaseUrl = latest.html_url || `https://github.com/harmonica80/Screenrecorder/releases/tag/${encodeURIComponent(latest.tag_name)}`;
-  return { status: compare(parse(latestVersion), current) > 0 ? 'available' : 'current', currentVersion, latestVersion, releaseUrl, releasesUrl };
+  const latestVersion = candidates[0].tag_name.replace(/^(?:advanced-)?v/, '');
+  return { status: compare(parse(latestVersion), current) > 0 ? 'available' : 'current', currentVersion, latestVersion, releasesUrl };
 }
 function checkForUpdates(currentVersion, edition = 'lite') {
   return new Promise((resolve, reject) => {
     const request = https.get('https://api.github.com/repos/harmonica80/Screenrecorder/releases?per_page=100', {
-      headers: { 'User-Agent': 'Screenrecorder-Pro', Accept: 'application/vnd.github+json' }
+      headers: { 'User-Agent': 'Screenrecorder-Pro-Lite', Accept: 'application/vnd.github+json' }
     }, response => {
       if (response.statusCode !== 200) {
         response.resume();

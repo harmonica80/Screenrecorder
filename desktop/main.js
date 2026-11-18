@@ -1,6 +1,6 @@
 const { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, nativeImage, globalShortcut } = require('electron');
 const { createShortcuts } = require('./shortcuts');
-const advancedEdition = true; // This branch only builds the Windows Advanced edition.
+const advancedEdition = require('../package.json').edition === 'advanced';
 const { createNativeMedia } = require('./native-media');
 const { createLiveRecording } = require('./live-recording');
 const { validateRustOptions, listRustSources, createRustRecording } = require('./rust-recorder');
@@ -14,7 +14,7 @@ function pathForNativeBinary() {
   return p.join(app.isPackaged ? process.resourcesPath : p.join(__dirname, '..', 'vendor'), 'ffmpeg', 'ffmpeg.exe');
 }
 const { createRecordingIndicator } = require('./recording-indicator');
-const { checkForUpdates } = require('./updates');
+const { checkForUpdates, releasesUrl } = require('./updates');
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -151,12 +151,7 @@ function registerRecordingHandlers() {
   ipcMain.handle('recording:configure-shortcuts', (_event, bindings) => shortcuts.configure(bindings));
   ipcMain.on('app:version', event => { event.returnValue = app.getVersion(); });
   ipcMain.handle('app:check-updates', () => checkForUpdates(app.getVersion(),advancedEdition ? 'advanced' : 'lite'));
-  ipcMain.handle('app:open-releases', (_event, url) => {
-    if (typeof url !== 'string' || !/^https:\/\/github\.com\/harmonica80\/Screenrecorder\/releases\/tag\/[A-Za-z0-9._-]+$/.test(url)) {
-      throw new Error('下載頁連結無效。');
-    }
-    return shell.openExternal(url);
-  });
+  ipcMain.handle('app:open-releases', () => shell.openExternal(releasesUrl));
   ipcMain.on('settings:initial-preferences', event => { event.returnValue = saveSettings.preferences || {}; });
   ipcMain.handle('settings:save-preferences', async (_event, preferences) => {
     if (!preferences || typeof preferences !== 'object' || JSON.stringify(preferences).length > 50000) throw new Error('設定資料無效');
