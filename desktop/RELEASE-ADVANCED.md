@@ -1,5 +1,7 @@
-# Windows 進階測試版 0.2.0-beta.14：RVM 去背與 GPL-3.0
+# Windows 進階測試版 0.2.0-beta.15：修正介面與 RVM 去背
 
+- 修正換行字元誤植造成介面顯示異常及功能無法使用。
+- 修正 RVM 前景與遮罩合成。
 - 新增 Robust Video Matting（RVM）WebGPU 去背，並設為預設品質模式。
 - 使用 RVM 的前景色與 alpha 遮罩合成，改善頭髮、細小邊緣及背景色溢出。
 - RVM／WebGPU 無法使用時，自動退回 MediaPipe 多類別模型，再退回快速模型。
