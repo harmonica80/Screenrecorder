@@ -577,6 +577,7 @@
                 <select id="segmentationQualitySelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
                   <option value="performance">效能優先（快速）</option><option value="quality">品質優先（MediaPipe）</option><option value="rvm" selected>RVM 高品質（預設）</option>
                 </select>
+                <span id="rvmDiagnostic" role="status" style="display:none; white-space:pre-wrap; overflow-wrap:anywhere; color:#b91c1c; margin-top:6px;"></span>
               </label>
               <label class="text-xs text-slate-600">外框粗細
                 <select id="cameraBorderWidthSelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
@@ -1765,6 +1766,13 @@
           } catch (error) {
             if (generation !== segmentationGeneration) return;
             rvmMattingFailed = true;
+            const diagnostic = document.getElementById('rvmDiagnostic');
+            if (diagnostic) {
+              const stage = rvmMatting?.stage || '未知步驟';
+              const detail = error?.message || String(error);
+              diagnostic.textContent = `RVM 啟動失敗（${stage}）：\n${detail}\n已改用 MediaPipe。請截圖此訊息以便排查。`;
+              diagnostic.style.display = 'block';
+            }
             const rvmOption = segmentationQualitySelect.querySelector('option[value="rvm"]');
             if (rvmOption) rvmOption.textContent = 'RVM 無法啟動，已改用 MediaPipe';
             rvmMatting?.close();

@@ -1,10 +1,4 @@
-# Windows 進階測試版 0.2.0-beta.15：修正介面與 RVM 去背
+# Windows 進階測試版 0.2.0-beta.16：顯示 RVM 錯誤原因
 
-- 修正換行字元誤植造成介面顯示異常及功能無法使用。
-- 修正 RVM 前景與遮罩合成。
-- 新增 Robust Video Matting（RVM）WebGPU 去背，並設為預設品質模式。
-- 使用 RVM 的前景色與 alpha 遮罩合成，改善頭髮、細小邊緣及背景色溢出。
-- RVM／WebGPU 無法使用時，自動退回 MediaPipe 多類別模型，再退回快速模型。
-- 固定 ONNX Runtime Web 1.24.3 與 RVM 相容修補模型來源；首次載入去背模型需要網路連線。
-- 專案程式碼授權改為 GPL-3.0-only；新增 GPL 授權全文與第三方元件聲明。
-- 網頁版與 Windows 進階版共用 RVM 去背實作。
+- RVM 無法啟動時，在去背品質選單下方顯示失敗步驟及錯誤訊息，方便截圖排查。
+- 保留 MediaPipe 備援去背。

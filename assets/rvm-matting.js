@@ -14,7 +14,9 @@
     }
     async initialize() {
       if (this.session) return;
+      this.stage = '檢查 WebGPU';
       if (!navigator.gpu) throw new Error('此瀏覽器沒有 WebGPU，RVM 將改用備援模型');
+      this.stage = '載入 ONNX Runtime';
       if (!window.ort) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -28,8 +30,10 @@
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.wasmPaths = ORT_WASM;
       ort.env.webgpu.powerPreference = 'high-performance';
+      this.stage = '取得 GPU 裝置';
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
       if (!adapter) throw new Error('找不到可用的 WebGPU 裝置');
+      this.stage = '載入模型並建立 WebGPU 推論';
       this.session = await ort.InferenceSession.create(MODEL_URL, {
         executionProviders: ['webgpu'], graphOptimizationLevel: 'all'
       });
@@ -43,6 +47,7 @@
     }
     async infer(frame) {
       await this.initialize();
+      this.stage = '處理攝影機影格';
       const started = performance.now();
       const scale = Math.min(1, this.longSide / Math.max(frame.width, frame.height));
       const width = Math.max(16, Math.round(frame.width * scale / 16) * 16);
@@ -74,8 +79,10 @@
       else for (const n of ['r1i', 'r2i', 'r3i', 'r4i']) feeds[n] = new this.ort.Tensor('float32', new Float32Array([0]), [1, 1, 1, 1]);
       let out;
       try {
+        this.stage = '執行 RVM 推論';
         out = await this.session.run(feeds);
       } finally { tensor.dispose(); feeds.downsample_ratio.dispose(); }
+      this.stage = '處理 RVM 推論結果';
       const pha = out.pha, fgr = out.fgr;
       const outH = pha.dims[2], outW = pha.dims[3], outPlane = outW * outH;
       const matteCanvas = document.createElement('canvas');
