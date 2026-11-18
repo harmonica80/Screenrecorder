@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/vision_bundle.js"></script>\n  <script src="assets/rvm-matting.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/vision_bundle.js"></script>
+  <script src="assets/rvm-matting.js"></script>
   <style>
     html.desktop-mode main {
       display: grid !important;
@@ -1165,7 +1166,9 @@
     let selfieSegmentation = null;
     let segmentationMask = null;
     let isSegmenting = false;
-    let qualitySegmenter = null;\n    let rvmMatting = null;\n    let rvmMattingFailed = false;
+    let qualitySegmenter = null;
+    let rvmMatting = null;
+    let rvmMattingFailed = false;
     let qualitySegmenterReady = null;
     let qualitySegmentationFailed = false;
     let lastQualityTimestamp = 0;
@@ -1723,9 +1726,15 @@
       personCtx.globalCompositeOperation = 'source-over';
       personCtx.imageSmoothingEnabled = true;
       personCtx.imageSmoothingQuality = 'high';
-      personCtx.drawImage(writeStabilizedMatte(results), 0, 0, width, height);
-      personCtx.globalCompositeOperation = 'source-in';
-      personCtx.drawImage(sourceImage, 0, 0, width, height);
+      if (results.rvmMatteCanvas && results.rvmForegroundCanvas) {
+        personCtx.drawImage(results.rvmForegroundCanvas, 0, 0, width, height);
+        personCtx.globalCompositeOperation = 'destination-in';
+        personCtx.drawImage(results.rvmMatteCanvas, 0, 0, width, height);
+      } else {
+        personCtx.drawImage(writeStabilizedMatte(results), 0, 0, width, height);
+        personCtx.globalCompositeOperation = 'source-in';
+        personCtx.drawImage(sourceImage, 0, 0, width, height);
+      }
       personCtx.globalCompositeOperation = 'source-over';
 
       if (backgroundEffectSelect.value === 'blur') {
@@ -1820,6 +1829,7 @@
       segmentationGeneration++;
       isSegmenting = false;
       resetMatteHistory();
+      rvmMatting?.reset();
     }
 
     function roundedRectPath(context, x, y, width, height, radius) {
