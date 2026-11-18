@@ -105,7 +105,7 @@
       }
       if (this.states) Object.values(this.states).forEach(t => t.dispose());
       this.states = next;
-      for (const [name, value] of Object.entries(out)) if (name !== 'r1o' && name !== 'r2o' && name !== 'r3o' && name !== 'r4o') value.dispose?.();
+      Object.values(out).forEach(value => value.dispose?.());
       const elapsed = performance.now() - started;
       this.timings.push(elapsed); if (this.timings.length > 15) this.timings.shift();
       if (this.timings.length === 15 && this.longSide > 640) {
