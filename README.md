@@ -1,8 +1,8 @@
 # 螢幕錄影工具 Pro（Screenrecorder）
 
-適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。\n\n**授權：** 網站說明與介面文字採用 [創用 CC 姓名標示-非商業性-相同方式分享 4.0 國際（CC BY-NC-SA 4.0）](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)。程式原始碼仍依專案既有 MIT 授權。
+適合教學示範、簡報與課程錄製的本機螢幕錄影工具，提供 **網頁版、Windows 免安裝輕量版與進階版**三種版本。\n\n**授權：** 網站說明與介面文字採用 [創用 CC 姓名標示-非商業性-相同方式分享 4.0 國際（CC BY-NC-SA 4.0）](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)。程式原始碼改採 [GNU GPL 第 3 版（GPL-3.0-only）](LICENSE)。
 
-## Screenrecorder 螢幕錄影工具線上版
+## 攝影機去背\n\n預設使用 RVM 高品質去背（WebGPU）。初次使用需連線載入 ONNX Runtime Web 與 RVM 模型；若裝置不支援 WebGPU 或載入失敗，會自動改用 MediaPipe。\n\n## Screenrecorder 螢幕錄影工具線上版
 
 **[立即開啟線上版](https://harmonica80.github.io/Screenrecorder/)**
 
