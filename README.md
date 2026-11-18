@@ -2,7 +2,7 @@
 
 本專案目前提供 **線上版**與 **Windows 進階版**，適合教學示範、簡報解說與課程錄製。
 
-## 線上版
+## 攝影機去背\n\n預設使用 RVM 高品質去背（WebGPU）。初次使用需連線載入 ONNX Runtime Web 與 RVM 模型；若裝置不支援 WebGPU 或載入失敗，會自動改用 MediaPipe。\n\n## 線上版
 
 **[立即開啟線上版](https://harmonica80.github.io/Screenrecorder/)**
 
@@ -16,4 +16,4 @@
 
 ## 開發與授權
 
-進階版原始碼與建置說明位於 [advanced-preview 分支](https://github.com/harmonica80/Screenrecorder/tree/advanced-preview)。網站說明與介面文字採用 [創用 CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)；程式原始碼依 MIT 授權。
+進階版原始碼與建置說明位於 [advanced-preview 分支](https://github.com/harmonica80/Screenrecorder/tree/advanced-preview)。網站說明與介面文字採用 [創用 CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hant)；程式原始碼改採 [GNU GPL 第 3 版（GPL-3.0-only）](LICENSE)。
