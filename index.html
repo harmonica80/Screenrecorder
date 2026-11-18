@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/vision_bundle.js"></script>
   <style>
     html.desktop-mode main {
       display: grid !important;
@@ -558,7 +559,7 @@
               </label>
               <label class="text-xs text-slate-600">去背品質
                 <select id="segmentationQualitySelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
-                  <option value="performance">效能優先</option><option value="quality" selected>品質優先</option>
+                  <option value="performance">效能優先（快速）</option><option value="quality" selected>品質優先（細節）</option>
                 </select>
               </label>
               <label class="text-xs text-slate-600">外框粗細
@@ -1074,8 +1075,25 @@
     let selfieSegmentation = null;
     let segmentationMask = null;
     let isSegmenting = false;
+    let qualitySegmenter = null;
+    let qualitySegmenterReady = null;
+    let qualitySegmentationFailed = false;
+    let lastQualityTimestamp = 0;
+    let matteHistory = null;
+    let matteHistoryWidth = 0;
+    let matteHistoryHeight = 0;
+    let segmentationGeneration = 0;
+    let legacyRequestGeneration = 0;
     const personCanvas = document.createElement('canvas');
     const personCtx = personCanvas.getContext('2d');
+    const matteMaskCanvas = document.createElement('canvas');
+    const matteMaskCtx = matteMaskCanvas.getContext('2d');
+    const rawMaskCanvas = document.createElement('canvas');
+    const rawMaskCtx = rawMaskCanvas.getContext('2d');
+    const segmentationFrameCanvas = document.createElement('canvas');
+    const segmentationFrameCtx = segmentationFrameCanvas.getContext('2d');
+    const segmentationInputCanvas = document.createElement('canvas');
+    const segmentationInputCtx = segmentationInputCanvas.getContext('2d');
 
     countdownToggle.checked = window.recordingPreferences.storage.getItem('screenRecorderCountdown') !== 'false';
     cameraQualitySelect.value = window.recordingPreferences.storage.getItem('screenRecorderCameraQuality') || 'high';
@@ -1464,6 +1482,7 @@
       });
       selfieSegmentation.setOptions({ modelSelection: 1 });
       selfieSegmentation.onResults(results => {
+        if (legacyRequestGeneration !== segmentationGeneration) return;
         segmentationMask = results.segmentationMask;
         renderEffectPreview(results);
         webcamVideo.style.visibility = 'hidden';
@@ -1472,55 +1491,223 @@
       });
     }
 
+    async function initializeQualitySegmenter() {
+      if (qualitySegmenter) return qualitySegmenter;
+      if (qualitySegmenterReady) return qualitySegmenterReady;
+      qualitySegmenterReady = (async () => {
+        const vision = window.Vision;
+        if (!vision?.FilesetResolver || !vision?.ImageSegmenter) {
+          throw new Error('MediaPipe Tasks Vision 載入失敗');
+        }
+        const baseUrl = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2';
+        const fileset = await vision.FilesetResolver.forVisionTasks(`${baseUrl}/wasm`);
+        const modelAssetPath = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
+        let lastError;
+        for (const delegate of ['GPU', 'CPU']) {
+          try {
+            return await vision.ImageSegmenter.createFromOptions(fileset, {
+              baseOptions: { modelAssetPath, delegate },
+              runningMode: 'VIDEO',
+              outputConfidenceMasks: true,
+              outputCategoryMask: false
+            });
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError || new Error('無法啟動人像細節分割模型');
+      })();
+      try {
+        qualitySegmenter = await qualitySegmenterReady;
+        return qualitySegmenter;
+      } catch (error) {
+        qualitySegmenterReady = null;
+        throw error;
+      }
+    }
+
+    function captureSegmentationFrame() {
+      const width = webcamVideo.videoWidth;
+      const height = webcamVideo.videoHeight;
+      if (!width || !height) return null;
+      if (segmentationFrameCanvas.width !== width || segmentationFrameCanvas.height !== height) {
+        segmentationFrameCanvas.width = width;
+        segmentationFrameCanvas.height = height;
+      }
+      segmentationFrameCtx.drawImage(webcamVideo, 0, 0, width, height);
+      const scale = Math.min(1, 512 / Math.max(width, height));
+      const inputWidth = Math.max(1, Math.round(width * scale));
+      const inputHeight = Math.max(1, Math.round(height * scale));
+      if (segmentationInputCanvas.width !== inputWidth || segmentationInputCanvas.height !== inputHeight) {
+        segmentationInputCanvas.width = inputWidth;
+        segmentationInputCanvas.height = inputHeight;
+      }
+      segmentationInputCtx.drawImage(segmentationFrameCanvas, 0, 0, inputWidth, inputHeight);
+      return { frame: segmentationFrameCanvas, input: segmentationInputCanvas };
+    }
+
+    function resetMatteHistory() {
+      matteHistory = null;
+      matteHistoryWidth = 0;
+      matteHistoryHeight = 0;
+    }
+
+    function writeStabilizedMatte(results) {
+      let matteWidth;
+      let matteHeight;
+      let getRawAlpha;
+      const confidenceMasks = results.confidenceMasks;
+      if (confidenceMasks?.length) {
+        const backgroundMask = confidenceMasks[0];
+        matteWidth = backgroundMask.width;
+        matteHeight = backgroundMask.height;
+        const values = backgroundMask.getAsFloat32Array();
+        const isMulticlass = confidenceMasks.length > 1;
+        getRawAlpha = index => isMulticlass ? 1 - values[index] : values[index];
+      } else {
+        const sourceMask = results.segmentationMask;
+        if (!sourceMask) throw new Error('人像分割結果沒有遮罩');
+        matteWidth = sourceMask.width || webcamVideo.videoWidth;
+        matteHeight = sourceMask.height || webcamVideo.videoHeight;
+        if (rawMaskCanvas.width !== matteWidth || rawMaskCanvas.height !== matteHeight) {
+          rawMaskCanvas.width = matteWidth;
+          rawMaskCanvas.height = matteHeight;
+        }
+        rawMaskCtx.clearRect(0, 0, matteWidth, matteHeight);
+        rawMaskCtx.drawImage(sourceMask, 0, 0, matteWidth, matteHeight);
+        const pixels = rawMaskCtx.getImageData(0, 0, matteWidth, matteHeight).data;
+        getRawAlpha = index => pixels[index * 4] / 255;
+      }
+
+      if (!matteWidth || !matteHeight) throw new Error('人像分割遮罩尺寸無效');
+      const count = matteWidth * matteHeight;
+      const sameHistory = matteHistory && matteHistoryWidth === matteWidth && matteHistoryHeight === matteHeight;
+      if (!sameHistory) {
+        matteHistory = new Float32Array(count);
+        matteHistoryWidth = matteWidth;
+        matteHistoryHeight = matteHeight;
+      }
+      if (matteMaskCanvas.width !== matteWidth || matteMaskCanvas.height !== matteHeight) {
+        matteMaskCanvas.width = matteWidth;
+        matteMaskCanvas.height = matteHeight;
+      }
+
+      const image = matteMaskCtx.createImageData(matteWidth, matteHeight);
+      for (let i = 0; i < count; i++) {
+        const raw = Math.max(0, Math.min(1, Number(getRawAlpha(i)) || 0));
+        let alpha = raw;
+        if (sameHistory) {
+          const previous = matteHistory[i];
+          const change = Math.abs(raw - previous);
+          // Follow moving edges quickly; smooth small mask changes to reduce shimmer.
+          const currentWeight = change > 0.16 ? 0.78 : 0.42;
+          alpha = previous + (raw - previous) * currentWeight;
+        }
+        matteHistory[i] = alpha;
+        const offset = i * 4;
+        image.data[offset] = 255;
+        image.data[offset + 1] = 255;
+        image.data[offset + 2] = 255;
+        image.data[offset + 3] = Math.round(alpha * 255);
+      }
+      matteMaskCtx.putImageData(image, 0, 0);
+      return matteMaskCanvas;
+    }
+
     function renderEffectPreview(results) {
       const width = webcamVideo.videoWidth;
       const height = webcamVideo.videoHeight;
       if (!width || !height || backgroundEffectSelect.value === 'none') return;
-
-      webcamEffectCanvas.width = width;
-      webcamEffectCanvas.height = height;
-      personCanvas.width = width;
-      personCanvas.height = height;
+      const sourceImage = results.image || webcamVideo;
+      if (webcamEffectCanvas.width !== width || webcamEffectCanvas.height !== height) {
+        webcamEffectCanvas.width = width;
+        webcamEffectCanvas.height = height;
+      }
+      if (personCanvas.width !== width || personCanvas.height !== height) {
+        personCanvas.width = width;
+        personCanvas.height = height;
+      }
       webcamEffectCtx.clearRect(0, 0, width, height);
       personCtx.clearRect(0, 0, width, height);
       personCtx.globalCompositeOperation = 'source-over';
-      personCtx.drawImage(results.segmentationMask, 0, 0, width, height);
+      personCtx.imageSmoothingEnabled = true;
+      personCtx.imageSmoothingQuality = 'high';
+      personCtx.drawImage(writeStabilizedMatte(results), 0, 0, width, height);
       personCtx.globalCompositeOperation = 'source-in';
-      personCtx.drawImage(results.image, 0, 0, width, height);
+      personCtx.drawImage(sourceImage, 0, 0, width, height);
       personCtx.globalCompositeOperation = 'source-over';
 
       if (backgroundEffectSelect.value === 'blur') {
         webcamEffectCtx.save();
         webcamEffectCtx.filter = 'blur(18px)';
-        webcamEffectCtx.drawImage(results.image, -18, -18, width + 36, height + 36);
+        webcamEffectCtx.drawImage(sourceImage, -18, -18, width + 36, height + 36);
         webcamEffectCtx.restore();
       }
       webcamEffectCtx.drawImage(personCanvas, 0, 0, width, height);
     }
 
-    function updateSegmentation() {
+    async function updateSegmentation() {
       if (backgroundEffectSelect.value === 'none' || !selfieSegmentation || isSegmenting || webcamVideo.readyState < 2) return;
       isSegmenting = true;
-      selfieSegmentation.send({ image: webcamVideo }).catch(error => {
+      const generation = segmentationGeneration;
+      try {
+        if (segmentationQualitySelect.value === 'quality' && !qualitySegmentationFailed) {
+          const snapshot = captureSegmentationFrame();
+          if (!snapshot) return;
+          try {
+            const segmenter = await initializeQualitySegmenter();
+            if (generation !== segmentationGeneration || backgroundEffectSelect.value === 'none') return;
+            const timestamp = lastQualityTimestamp = Math.max(lastQualityTimestamp + 1, performance.now());
+            const result = segmenter.segmentForVideo(snapshot.input, timestamp);
+            try {
+              renderEffectPreview({ image: snapshot.frame, confidenceMasks: result.confidenceMasks });
+            } finally {
+              result.close();
+            }
+            webcamVideo.style.visibility = 'hidden';
+            webcamEffectCanvas.style.display = 'block';
+            return;
+          } catch (error) {
+            if (generation !== segmentationGeneration) return;
+            qualitySegmentationFailed = true;
+            const qualityOption = segmentationQualitySelect.querySelector('option[value="quality"]');
+            if (qualityOption) qualityOption.textContent = '品質優先（載入失敗，已改用快速模式）';
+            resetMatteHistory();
+            console.warn('高品質人像分割無法啟動，改用快速人像模型：', error);
+          }
+          if (generation !== segmentationGeneration || backgroundEffectSelect.value === 'none') return;
+          legacyRequestGeneration = generation;
+          await selfieSegmentation.send({ image: snapshot.frame });
+          return;
+        }
+
+        legacyRequestGeneration = generation;
+        await selfieSegmentation.send({ image: webcamVideo });
+      } catch (error) {
         console.warn('人像分割處理失敗，暫時回復原始畫面：', error);
-        isSegmenting = false;
-        webcamVideo.style.visibility = 'visible';
-        webcamEffectCanvas.style.display = 'none';
-      });
+        if (generation === segmentationGeneration) {
+          webcamVideo.style.visibility = 'visible';
+          webcamEffectCanvas.style.display = 'none';
+        }
+      } finally {
+        if (generation === segmentationGeneration) isSegmenting = false;
+      }
     }
 
     function startSegmentationLoop() {
       stopSegmentationLoop();
       if (!cameraStream || backgroundEffectSelect.value === 'none') return;
       updateSegmentation();
-      // 品質優先提供較密集的遮罩更新；效能優先降低 CPU 使用量。
+      // 品質模式用多類別人像遮罩；效能模式保留較輕量的自拍分割模型。
       segmentationLoopId = setInterval(updateSegmentation, segmentationQualitySelect.value === 'quality' ? 50 : 125);
     }
 
     function stopSegmentationLoop() {
       if (segmentationLoopId) clearInterval(segmentationLoopId);
       segmentationLoopId = null;
+      segmentationGeneration++;
       isSegmenting = false;
+      resetMatteHistory();
     }
 
     function roundedRectPath(context, x, y, width, height, radius) {
