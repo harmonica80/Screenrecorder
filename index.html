@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/vision_bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/vision_bundle.js"></script>\n  <script src="assets/rvm-matting.js"></script>
   <style>
     html.desktop-mode main {
       display: grid !important;
@@ -574,7 +574,7 @@
               </label>
               <label class="text-xs text-slate-600">去背品質
                 <select id="segmentationQualitySelect" class="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-700">
-                  <option value="performance">效能優先（快速）</option><option value="quality" selected>品質優先（細節）</option>
+                  <option value="performance">效能優先（快速）</option><option value="quality">品質優先（MediaPipe）</option><option value="rvm" selected>RVM 高品質（預設）</option>
                 </select>
               </label>
               <label class="text-xs text-slate-600">外框粗細
@@ -1165,7 +1165,7 @@
     let selfieSegmentation = null;
     let segmentationMask = null;
     let isSegmenting = false;
-    let qualitySegmenter = null;
+    let qualitySegmenter = null;\n    let rvmMatting = null;\n    let rvmMattingFailed = false;
     let qualitySegmenterReady = null;
     let qualitySegmentationFailed = false;
     let lastQualityTimestamp = 0;
@@ -1187,7 +1187,7 @@
 
     countdownToggle.checked = window.recordingPreferences.storage.getItem('screenRecorderCountdown') !== 'false';
     cameraQualitySelect.value = window.recordingPreferences.storage.getItem('screenRecorderCameraQuality') || 'high';
-    segmentationQualitySelect.value = window.recordingPreferences.storage.getItem('screenRecorderSegmentationQuality') || 'quality';
+    segmentationQualitySelect.value = window.recordingPreferences.storage.getItem('screenRecorderSegmentationQuality') || 'rvm';
     countdownSecondsSelect.value = window.recordingPreferences.storage.getItem('screenRecorderCountdownSeconds') || '3';
     countdownSecondsSelect.disabled = !countdownToggle.checked;
     countdownToggle.addEventListener('change', () => {
@@ -1617,7 +1617,7 @@
       }
     }
 
-    function captureSegmentationFrame() {
+    function captureSegmentationFrame(maxLongSide = 512) {
       const width = webcamVideo.videoWidth;
       const height = webcamVideo.videoHeight;
       if (!width || !height) return null;
@@ -1626,7 +1626,7 @@
         segmentationFrameCanvas.height = height;
       }
       segmentationFrameCtx.drawImage(webcamVideo, 0, 0, width, height);
-      const scale = Math.min(1, 512 / Math.max(width, height));
+      const scale = Math.min(1, maxLongSide / Math.max(width, height));
       const inputWidth = Math.max(1, Math.round(width * scale));
       const inputHeight = Math.max(1, Math.round(height * scale));
       if (segmentationInputCanvas.width !== inputWidth || segmentationInputCanvas.height !== inputHeight) {
@@ -1742,7 +1742,28 @@
       isSegmenting = true;
       const generation = segmentationGeneration;
       try {
-        if (segmentationQualitySelect.value === 'quality' && !qualitySegmentationFailed) {
+        if (segmentationQualitySelect.value === 'rvm' && !rvmMattingFailed) {
+          const snapshot = captureSegmentationFrame(960);
+          if (!snapshot) return;
+          try {
+            if (!rvmMatting) rvmMatting = new window.RVMMatting();
+            const result = await rvmMatting.infer(snapshot.input);
+            if (generation !== segmentationGeneration || backgroundEffectSelect.value === 'none') return;
+            renderEffectPreview({ image: snapshot.frame, rvmMatteCanvas: result.matteCanvas, rvmForegroundCanvas: result.foregroundCanvas });
+            webcamVideo.style.visibility = 'hidden';
+            webcamEffectCanvas.style.display = 'block';
+            return;
+          } catch (error) {
+            if (generation !== segmentationGeneration) return;
+            rvmMattingFailed = true;
+            const rvmOption = segmentationQualitySelect.querySelector('option[value="rvm"]');
+            if (rvmOption) rvmOption.textContent = 'RVM 無法啟動，已改用 MediaPipe';
+            rvmMatting?.close();
+            rvmMatting = null;
+            console.warn('RVM 無法啟動，改用 MediaPipe 多類別模型：', error);
+          }
+        }
+        if ((segmentationQualitySelect.value === 'quality' || rvmMattingFailed) && !qualitySegmentationFailed) {
           const snapshot = captureSegmentationFrame();
           if (!snapshot) return;
           try {
@@ -1790,7 +1811,7 @@
       if (!cameraStream || backgroundEffectSelect.value === 'none') return;
       updateSegmentation();
       // 品質模式用多類別人像遮罩；效能模式保留較輕量的自拍分割模型。
-      segmentationLoopId = setInterval(updateSegmentation, segmentationQualitySelect.value === 'quality' ? 50 : 125);
+      segmentationLoopId = setInterval(updateSegmentation, segmentationQualitySelect.value === 'performance' ? 125 : 50);
     }
 
     function stopSegmentationLoop() {
