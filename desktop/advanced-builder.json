@@ -12,8 +12,9 @@
   "productName": "螢幕錄影工具Pro進階版",
   "extraMetadata": {
     "name": "screenrecorder-pro-advanced",
-    "version": "0.2.1",
-    "edition": "advanced"
+    "version": "0.2.2",
+    "edition": "advanced",
+    "description": "Screenrecorder螢幕錄影工具 Windows 免安裝進階版"
   },
   "directories": {
     "output": "release-advanced"
@@ -37,10 +38,10 @@
         ]
       }
     ],
-    "artifactName": "Screenrecorder-Pro-Advanced-0.2.1-Portable.exe",
+    "artifactName": "Screenrecorder-Pro-Advanced-0.2.2-Portable.exe",
     "icon": "assets/app-icon.ico"
   },
   "portable": {
-    "artifactName": "Screenrecorder-Pro-Advanced-0.2.1-Portable.exe"
+    "artifactName": "Screenrecorder-Pro-Advanced-0.2.2-Portable.exe"
   }
 }

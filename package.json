@@ -1,7 +1,7 @@
 {
   "name": "screenrecorder-pro-lite",
   "version": "0.1.5",
-  "description": "螢幕錄影工具 Pro Windows 免安裝輕量版",
+  "description": "Screenrecorder螢幕錄影工具 Windows 免安裝進階版",
   "main": "desktop/main.js",
   "author": "述文老師",
   "license": "GPL-3.0-only",

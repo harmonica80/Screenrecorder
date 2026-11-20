@@ -36,9 +36,17 @@ jobs:
         env:
           ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify executable description
+        shell: pwsh
+        run: |
+          $exe = Get-Item 'release-advanced/Screenrecorder-Pro-Advanced-0.2.2-Portable.exe'
+          $actual = $exe.VersionInfo.FileDescription
+          $expected = 'Screenrecorder螢幕錄影工具 Windows 免安裝進階版'
+          if ($actual -cne $expected) { throw "Unexpected FileDescription: $actual" }
+          Write-Host "FileDescription verified: $actual"
       - uses: actions/upload-artifact@v4
         with:
-          name: Screenrecorder-Pro-Advanced-0.2.1
+          name: Screenrecorder-Pro-Advanced-0.2.2
           path: release-advanced/*.exe
           retention-days: 14
       - uses: actions/github-script@v7
